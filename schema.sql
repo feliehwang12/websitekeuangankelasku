@@ -1,29 +1,28 @@
 -- ══════════════════════════════════════════════════════════════
 --  schema.sql — Keuangan Kelasku
---  Cara pakai: Buka Supabase → SQL Editor → New Query
---              Paste seluruh isi file ini → klik "Run"
+--  Cara pakai: Supabase → SQL Editor → New Query → Paste → Run
+--  Aman dijalankan berulang kali (idempotent)
 -- ══════════════════════════════════════════════════════════════
 
--- ── 1. Aktifkan ekstensi uuid (biasanya sudah aktif) ──────────
+-- ── Aktifkan ekstensi uuid ────────────────────────────────────
 create extension if not exists "uuid-ossp";
 
 -- ══════════════════════════════════════════════════════════════
 --  TABEL: profiles
---  Menyimpan data profil user setelah sign up via Supabase Auth
 -- ══════════════════════════════════════════════════════════════
 create table if not exists public.profiles (
-  id        uuid primary key references auth.users(id) on delete cascade,
-  nama      text        not null,
-  email     text        not null,
-  role      text        not null default 'siswa'
-              check (role in ('siswa','bendahara')),
-  aktif     boolean     not null default true,
-  nis       text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  id          uuid primary key references auth.users(id) on delete cascade,
+  nama        text        not null,
+  email       text        not null,
+  role        text        not null default 'siswa'
+                check (role in ('siswa','bendahara')),
+  aktif       boolean     not null default true,
+  nis         text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
 );
 
--- ── Trigger: otomatis buat profil saat user baru sign up ─────
+-- ── Trigger: auto-buat profil saat user baru sign up ─────────
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -36,7 +35,7 @@ begin
     new.id,
     coalesce(new.raw_user_meta_data->>'nama', split_part(new.email,'@',1)),
     new.email,
-    'siswa'   -- semua user baru default jadi 'siswa'
+    'siswa'
   )
   on conflict (id) do nothing;
   return new;
@@ -48,7 +47,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
--- ── Trigger: update timestamp ─────────────────────────────────
+-- ── Trigger: auto-update timestamp ───────────────────────────
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$
 begin
@@ -88,7 +87,7 @@ create trigger transaksi_updated_at
 create table if not exists public.iuran (
   id          uuid primary key default uuid_generate_v4(),
   siswa_id    uuid        not null references public.profiles(id) on delete cascade,
-  bulan       text        not null,   -- format: 'YYYY-MM'
+  bulan       text        not null,
   nominal     bigint      not null default 10000,
   status      text        not null default 'belum' check (status in ('lunas','belum')),
   tgl_bayar   date,
@@ -141,19 +140,21 @@ create trigger kegiatan_bayar_updated_at
   for each row execute procedure public.set_updated_at();
 
 -- ══════════════════════════════════════════════════════════════
---  ROW LEVEL SECURITY (RLS) — Lapisan keamanan utama
+--  ROW LEVEL SECURITY (RLS)
+--  DROP dulu semua policy agar bisa dijalankan berulang kali
 -- ══════════════════════════════════════════════════════════════
 
 -- ── profiles ─────────────────────────────────────────────────
 alter table public.profiles enable row level security;
 
--- Semua user login bisa baca semua profil (untuk menampilkan daftar siswa)
+drop policy if exists "profiles: semua user login bisa baca"    on public.profiles;
+drop policy if exists "profiles: user update milik sendiri"     on public.profiles;
+
 create policy "profiles: semua user login bisa baca"
   on public.profiles for select
   to authenticated
   using (true);
 
--- User hanya bisa update profil sendiri
 create policy "profiles: user update milik sendiri"
   on public.profiles for update
   to authenticated
@@ -162,13 +163,16 @@ create policy "profiles: user update milik sendiri"
 -- ── transaksi ─────────────────────────────────────────────────
 alter table public.transaksi enable row level security;
 
--- Semua user login bisa baca transaksi
+drop policy if exists "transaksi: semua user login bisa baca"   on public.transaksi;
+drop policy if exists "transaksi: hanya bendahara bisa tambah"  on public.transaksi;
+drop policy if exists "transaksi: hanya bendahara bisa update"  on public.transaksi;
+drop policy if exists "transaksi: hanya bendahara bisa hapus"   on public.transaksi;
+
 create policy "transaksi: semua user login bisa baca"
   on public.transaksi for select
   to authenticated
   using (true);
 
--- Hanya bendahara yang bisa insert/update/delete transaksi
 create policy "transaksi: hanya bendahara bisa tambah"
   on public.transaksi for insert
   to authenticated
@@ -192,6 +196,11 @@ create policy "transaksi: hanya bendahara bisa hapus"
 
 -- ── iuran ─────────────────────────────────────────────────────
 alter table public.iuran enable row level security;
+
+drop policy if exists "iuran: semua user login bisa baca"       on public.iuran;
+drop policy if exists "iuran: hanya bendahara bisa tambah"      on public.iuran;
+drop policy if exists "iuran: hanya bendahara bisa update"      on public.iuran;
+drop policy if exists "iuran: hanya bendahara bisa hapus"       on public.iuran;
 
 create policy "iuran: semua user login bisa baca"
   on public.iuran for select
@@ -222,6 +231,11 @@ create policy "iuran: hanya bendahara bisa hapus"
 -- ── kegiatan ─────────────────────────────────────────────────
 alter table public.kegiatan enable row level security;
 
+drop policy if exists "kegiatan: semua user login bisa baca"    on public.kegiatan;
+drop policy if exists "kegiatan: hanya bendahara bisa tambah"   on public.kegiatan;
+drop policy if exists "kegiatan: hanya bendahara bisa update"   on public.kegiatan;
+drop policy if exists "kegiatan: hanya bendahara bisa hapus"    on public.kegiatan;
+
 create policy "kegiatan: semua user login bisa baca"
   on public.kegiatan for select
   to authenticated
@@ -250,6 +264,11 @@ create policy "kegiatan: hanya bendahara bisa hapus"
 
 -- ── kegiatan_bayar ────────────────────────────────────────────
 alter table public.kegiatan_bayar enable row level security;
+
+drop policy if exists "kegiatan_bayar: semua user login bisa baca"   on public.kegiatan_bayar;
+drop policy if exists "kegiatan_bayar: hanya bendahara bisa tambah"  on public.kegiatan_bayar;
+drop policy if exists "kegiatan_bayar: hanya bendahara bisa update"  on public.kegiatan_bayar;
+drop policy if exists "kegiatan_bayar: hanya bendahara bisa hapus"   on public.kegiatan_bayar;
 
 create policy "kegiatan_bayar: semua user login bisa baca"
   on public.kegiatan_bayar for select

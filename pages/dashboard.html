@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Keuangan Kelasku</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    /* Dashboard-specific */
+    .welcome-banner {
+      background: linear-gradient(135deg, var(--emerald-700) 0%, var(--emerald-800) 60%, var(--emerald-900) 100%);
+      border-radius: var(--radius-xl);
+      padding: 1.75rem 2rem;
+      margin-bottom: 1.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; overflow: hidden; position: relative;
+    }
+    .welcome-banner::after {
+      content: '💰';
+      position: absolute; right: 1.5rem; top: 50%; transform: translateY(-50%);
+      font-size: 5rem; opacity: .15;
+    }
+    .welcome-banner h2 { color: white; font-size: 1.4rem; margin-bottom: .3rem; }
+    .welcome-banner p  { color: var(--emerald-200); font-size: .875rem; }
+    .welcome-chip {
+      background: rgba(255,255,255,.15); color: white;
+      padding: .3rem .9rem; border-radius: var(--radius-full);
+      font-size: .75rem; font-weight: 600; margin-top: .5rem; display: inline-block;
+    }
+
+    .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
+    @media (max-width: 900px)  { .dashboard-grid { grid-template-columns: 1fr; } }
+
+    /* Iuran summary card */
+    .iuran-progress-list { list-style: none; }
+    .iuran-progress-item {
+      display: flex; align-items: center; gap: .75rem;
+      padding: .6rem 0;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .iuran-progress-item:last-child { border-bottom: none; }
+    .iuran-bulan { min-width: 100px; font-size: .82rem; font-weight: 600; color: var(--gray-700); }
+    .iuran-bar   { flex: 1; }
+    .iuran-pct   { min-width: 40px; text-align: right; font-size: .78rem; font-weight: 600; color: var(--emerald-600); }
+
+    /* Recent transactions */
+    .trx-item {
+      display: flex; align-items: center; gap: .875rem;
+      padding: .75rem 0;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .trx-item:last-child { border-bottom: none; }
+    .trx-icon {
+      width: 38px; height: 38px; flex-shrink: 0;
+      border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .875rem;
+    }
+    .trx-icon--masuk  { background: var(--emerald-50); }
+    .trx-icon--keluar { background: #fef2f2; }
+    .trx-info { flex: 1; min-width: 0; }
+    .trx-info strong { display: block; font-size: .875rem; color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .trx-info span   { font-size: .75rem; color: var(--gray-500); }
+    .trx-nominal { font-weight: 700; font-size: .875rem; white-space: nowrap; }
+    .trx-nominal--masuk  { color: var(--emerald-600); }
+    .trx-nominal--keluar { color: var(--red-500); }
+
+    /* Kegiatan summary */
+    .kegiatan-card-item {
+      background: var(--gray-50); border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      padding: .875rem 1rem;
+      margin-bottom: .75rem;
+    }
+    .kegiatan-card-item:last-child { margin-bottom: 0; }
+    .kegiatan-card-item h4 { font-size: .875rem; margin-bottom: .25rem; }
+    .kegiatan-card-item p  { font-size: .78rem; color: var(--gray-500); margin-bottom: .5rem; }
+
+    /* Saldo big */
+    .saldo-display {
+      text-align: center; padding: .5rem 0;
+    }
+    .saldo-display .label { font-size: .8rem; color: var(--gray-500); font-weight: 500; margin-bottom: .25rem; }
+    .saldo-display .amount {
+      font-size: 2.2rem; font-weight: 800;
+      background: linear-gradient(135deg, var(--emerald-600), var(--emerald-400));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .saldo-display .sub { font-size: .75rem; color: var(--gray-400); margin-top: .25rem; }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar" id="appSidebar"></aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="main-content">
+      <header class="topbar" id="appTopbar"></header>
+      <main class="page-content" id="pageContent">
+        <!-- konten dirender oleh JS -->
+      </main>
+    </div>
+  </div>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script>
+    Layout.init('dashboard');
+    renderDashboard();
+
+    function renderDashboard() {
+      const sesi   = DB.getSesi();
+      const saldo  = DB.getSaldo();
+      const masuk  = DB.getTotalMasuk();
+      const keluar = DB.getTotalKeluar();
+      const iuran  = DB.getIuran();
+      const siswa  = DB.getSiswa().filter(s => s.role === 'siswa' && s.aktif);
+      const bulanList = DB.getBulanIuran();
+      const trxList   = [...DB.getTransaksi()].sort((a,b) => new Date(b.tgl) - new Date(a.tgl)).slice(0, 5);
+      const kegiatan  = DB.getKegiatan();
+
+      // Iuran bulan ini
+      const bulanIni = new Date().toISOString().slice(0, 7);
+      const iuranBulanIni = iuran.filter(i => i.bulan === bulanIni);
+      const lunasBulanIni = iuranBulanIni.filter(i => i.status === 'lunas').length;
+
+      // Iuran per bulan progress
+      const iuranProgressHTML = bulanList.slice(-5).reverse().map(bln => {
+        const total  = iuran.filter(i => i.bulan === bln).length;
+        const lunas  = iuran.filter(i => i.bulan === bln && i.status === 'lunas').length;
+        const pct    = total ? Math.round(lunas / total * 100) : 0;
+        return `
+          <li class="iuran-progress-item">
+            <span class="iuran-bulan">${Utils.bulanIndo(bln)}</span>
+            <div class="iuran-bar">
+              <div class="progress">
+                <div class="progress-bar" style="width:${pct}%"></div>
+              </div>
+            </div>
+            <span class="iuran-pct">${pct}%</span>
+          </li>`;
+      }).join('');
+
+      // Recent transactions
+      const trxHTML = trxList.length === 0
+        ? `<div class="empty-state"><div class="empty-icon">📭</div><p>Belum ada transaksi</p></div>`
+        : trxList.map(t => `
+          <div class="trx-item">
+            <div class="trx-icon trx-icon--${t.jenis}">${t.jenis === 'masuk' ? '⬆️' : '⬇️'}</div>
+            <div class="trx-info">
+              <strong>${t.keterangan}</strong>
+              <span>${Utils.tglIndo(t.tgl)} · ${t.kategori}</span>
+            </div>
+            <span class="trx-nominal trx-nominal--${t.jenis}">
+              ${t.jenis === 'masuk' ? '+' : '-'}${Utils.rupiah(t.nominal)}
+            </span>
+          </div>`).join('');
+
+      // Kegiatan cards
+      const kgHTML = kegiatan.length === 0
+        ? `<div class="empty-state"><div class="empty-icon">🏊</div><p>Belum ada kegiatan</p></div>`
+        : kegiatan.slice(0, 3).map(kg => {
+            const bayar  = DB.getKgBayar(kg.id);
+            const total  = siswa.length;
+            const lunas  = Object.values(bayar).filter(b => b.status === 'lunas').length;
+            const pct    = total ? Math.round(lunas / total * 100) : 0;
+            return `
+              <div class="kegiatan-card-item">
+                <div class="flex-between">
+                  <h4>🎯 ${kg.nama}</h4>
+                  <span class="badge badge--info">${Utils.rupiah(kg.nominal)}</span>
+                </div>
+                <p>${Utils.tglIndo(kg.tgl)}</p>
+                <div class="flex" style="gap:.5rem;align-items:center;">
+                  <div class="progress" style="flex:1">
+                    <div class="progress-bar" style="width:${pct}%"></div>
+                  </div>
+                  <span class="text-sm fw-600 text-green">${lunas}/${total}</span>
+                </div>
+              </div>`;
+          }).join('');
+
+      // Iuran siswa sendiri (jika bukan bendahara)
+      let myIuranHTML = '';
+      if (sesi.role === 'siswa') {
+        const myIuran = DB.getIuranSiswa(sesi.siswaId).slice(-3).reverse();
+        myIuranHTML = `
+          <div class="card mt-4">
+            <div class="card-header">
+              <h3>📅 Iuranku</h3>
+              <a href="kas.html" class="btn btn-sm btn-outline">Lihat Semua</a>
+            </div>
+            <div class="card-body">
+              ${myIuran.length === 0 ? '<div class="empty-state"><p>Belum ada data iuran</p></div>'
+              : `<table class="table">
+                  <thead><tr><th>Bulan</th><th>Nominal</th><th>Status</th><th>Tgl Bayar</th></tr></thead>
+                  <tbody>
+                  ${myIuran.map(i => `
+                    <tr>
+                      <td data-label="Bulan">${Utils.bulanIndo(i.bulan)}</td>
+                      <td data-label="Nominal">${Utils.rupiah(i.nominal)}</td>
+                      <td data-label="Status"><span class="badge ${Utils.badgeStatus(i.status)}">${i.status === 'lunas' ? '✓ Lunas' : '⏳ Belum'}</span></td>
+                      <td data-label="Tgl Bayar">${Utils.tglIndo(i.tglBayar)}</td>
+                    </tr>`).join('')}
+                  </tbody>
+                </table>`}
+            </div>
+          </div>`;
+      }
+
+      document.getElementById('pageContent').innerHTML = `
+        <!-- Welcome banner -->
+        <div class="welcome-banner">
+          <div>
+            <h2>Halo, ${sesi.nama.split(' ')[0]}! 👋</h2>
+            <p>Sistem Pengelolaan Kas Kelas Digital</p>
+            <span class="welcome-chip">${sesi.role === 'bendahara' ? '💼 Mode Bendahara' : '🎓 Mode Siswa'}</span>
+          </div>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="stat-grid">
+          <div class="stat-card stat-card--green">
+            <div class="stat-icon stat-icon--green">💰</div>
+            <div class="stat-info">
+              <p>Saldo Kas</p>
+              <h3>${Utils.rupiah(saldo)}</h3>
+              <span>Kas kelas saat ini</span>
+            </div>
+          </div>
+          <div class="stat-card stat-card--gold">
+            <div class="stat-icon stat-icon--gold">📈</div>
+            <div class="stat-info">
+              <p>Total Pemasukan</p>
+              <h3>${Utils.rupiah(masuk)}</h3>
+              <span>Semua transaksi masuk</span>
+            </div>
+          </div>
+          <div class="stat-card stat-card--red">
+            <div class="stat-icon stat-icon--red">📉</div>
+            <div class="stat-info">
+              <p>Total Pengeluaran</p>
+              <h3>${Utils.rupiah(keluar)}</h3>
+              <span>Semua transaksi keluar</span>
+            </div>
+          </div>
+          <div class="stat-card stat-card--blue">
+            <div class="stat-icon stat-icon--blue">✅</div>
+            <div class="stat-info">
+              <p>Iuran Bulan Ini</p>
+              <h3>${lunasBulanIni} / ${siswa.length}</h3>
+              <span>Siswa sudah lunas</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard grid -->
+        <div class="dashboard-grid">
+          <!-- Iuran progress -->
+          <div class="card">
+            <div class="card-header">
+              <h3>📊 Rekap Iuran Bulanan</h3>
+              <a href="kas.html" class="btn btn-sm btn-outline">Detail</a>
+            </div>
+            <div class="card-body">
+              ${bulanList.length === 0
+                ? '<div class="empty-state"><div class="empty-icon">📅</div><p>Belum ada data iuran</p></div>'
+                : `<ul class="iuran-progress-list">${iuranProgressHTML}</ul>`}
+            </div>
+          </div>
+
+          <!-- Recent transactions -->
+          <div class="card">
+            <div class="card-header">
+              <h3>🕐 Transaksi Terbaru</h3>
+              <a href="laporan.html" class="btn btn-sm btn-outline">Semua</a>
+            </div>
+            <div class="card-body">${trxHTML}</div>
+          </div>
+
+          <!-- Kegiatan -->
+          <div class="card">
+            <div class="card-header">
+              <h3>🏊 Uang Kegiatan</h3>
+              <a href="kegiatan.html" class="btn btn-sm btn-outline">Detail</a>
+            </div>
+            <div class="card-body">${kgHTML}</div>
+          </div>
+
+          <!-- Jumlah siswa -->
+          <div class="card">
+            <div class="card-header">
+              <h3>👥 Ringkasan Kelas</h3>
+              <a href="siswa.html" class="btn btn-sm btn-outline">Data Siswa</a>
+            </div>
+            <div class="card-body">
+              <div class="saldo-display">
+                <div class="label">Total Siswa Aktif</div>
+                <div class="amount">${siswa.length}</div>
+                <div class="sub">Siswa terdaftar di kelas</div>
+              </div>
+              <hr class="divider" />
+              <div class="flex-between text-sm" style="padding:.25rem 0">
+                <span>Jumlah Bendahara</span><strong>1 orang</strong>
+              </div>
+              <div class="flex-between text-sm" style="padding:.25rem 0">
+                <span>Kegiatan berjalan</span><strong>${kegiatan.length} kegiatan</strong>
+              </div>
+              <div class="flex-between text-sm" style="padding:.25rem 0">
+                <span>Total transaksi</span><strong>${DB.getTransaksi().length} entri</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        ${myIuranHTML}
+      `;
+    }
+  </script>
+</body>
+</html>

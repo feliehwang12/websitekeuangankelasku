@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Uang Kegiatan — Keuangan Kelasku</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .kegiatan-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.25rem; margin-bottom: 1.5rem;
+    }
+    .kegiatan-card {
+      background: white; border-radius: var(--radius-lg);
+      box-shadow: var(--shadow); overflow: hidden;
+      border: 1px solid var(--gray-100);
+      transition: var(--transition);
+    }
+    .kegiatan-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    .kegiatan-card-head {
+      background: linear-gradient(135deg, var(--emerald-700), var(--emerald-800));
+      padding: 1.25rem 1.5rem;
+      display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem;
+    }
+    .kegiatan-card-head h3 { color: white; font-size: 1rem; margin-bottom: .25rem; }
+    .kegiatan-card-head p  { color: var(--emerald-200); font-size: .78rem; }
+    .kegiatan-nominal {
+      background: var(--gold-500); color: white;
+      padding: .25rem .75rem; border-radius: var(--radius-full);
+      font-size: .8rem; font-weight: 700; white-space: nowrap;
+    }
+    .kegiatan-card-body { padding: 1.25rem; }
+    .kegiatan-stat {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: .75rem;
+    }
+    .kegiatan-stat .label { font-size: .8rem; color: var(--gray-500); }
+    .kegiatan-stat .val   { font-size: .9rem; font-weight: 700; }
+    .kegiatan-actions { display: flex; gap: .5rem; padding: .875rem 1.25rem; border-top: 1px solid var(--gray-100); }
+
+    /* Detail panel */
+    .detail-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.5); backdrop-filter: blur(4px);
+      z-index: 200; display: flex; align-items: center; justify-content: center; padding: 1rem;
+      opacity: 0; visibility: hidden; transition: all .2s;
+    }
+    .detail-overlay.active { opacity: 1; visibility: visible; }
+    .detail-panel {
+      background: white; border-radius: var(--radius-xl);
+      width: 100%; max-width: 720px; max-height: 90vh;
+      overflow-y: auto; box-shadow: var(--shadow-xl);
+      transform: scale(.95); transition: all .2s;
+    }
+    .detail-overlay.active .detail-panel { transform: scale(1); }
+    .detail-panel-head {
+      background: linear-gradient(135deg, var(--emerald-700), var(--emerald-800));
+      padding: 1.5rem;
+      position: sticky; top: 0; z-index: 1;
+    }
+    .detail-panel-head .flex-between { align-items: flex-start; }
+    .detail-panel-head h2 { color: white; margin-bottom: .25rem; }
+    .detail-panel-head p  { color: var(--emerald-200); font-size: .875rem; }
+    .detail-close {
+      background: rgba(255,255,255,.15); border: none; border-radius: var(--radius-full);
+      width: 36px; height: 36px; cursor: pointer; color: white; font-size: 1rem;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+
+    .siswa-row {
+      display: flex; align-items: center; gap: .875rem;
+      padding: .65rem 0; border-bottom: 1px solid var(--gray-100);
+    }
+    .siswa-row:last-child { border-bottom: none; }
+    .siswa-row-no { width: 28px; text-align: right; font-size: .75rem; color: var(--gray-400); font-weight: 600; }
+    .siswa-row-avatar {
+      width: 36px; height: 36px; border-radius: var(--radius-full);
+      background: linear-gradient(135deg, var(--emerald-400), var(--emerald-600));
+      color: white; font-weight: 700; font-size: .8rem;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .siswa-row-info { flex: 1; min-width: 0; }
+    .siswa-row-info strong { display: block; font-size: .875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .siswa-row-info span   { font-size: .75rem; color: var(--gray-500); }
+    .toggle-bayar {
+      padding: .35rem .875rem; border-radius: var(--radius-full);
+      font-size: .78rem; font-weight: 700; cursor: pointer;
+      border: 2px solid; transition: var(--transition); white-space: nowrap;
+    }
+    .toggle-bayar--lunas { background: var(--emerald-500); border-color: var(--emerald-500); color: white; }
+    .toggle-bayar--belum { background: white; border-color: var(--gray-300); color: var(--gray-500); }
+    .toggle-bayar--belum:hover { border-color: var(--emerald-400); color: var(--emerald-600); }
+    .toggle-bayar:disabled { cursor: default; }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar" id="appSidebar"></aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div class="main-content">
+      <header class="topbar" id="appTopbar"></header>
+      <main class="page-content">
+
+        <div class="page-header">
+          <div class="page-header-text">
+            <h2>Uang Kegiatan & Titipan</h2>
+            <p>Pencatatan uang kegiatan di luar kas rutin (renang, study tour, dll)</p>
+          </div>
+          <button class="btn btn-primary" id="btnTambahKegiatan">+ Kegiatan Baru</button>
+        </div>
+
+        <div id="kegiatanGrid" class="kegiatan-grid"></div>
+        <div id="emptyKegiatan" class="d-none">
+          <div class="empty-state card" style="padding:3rem">
+            <div class="empty-icon">🏊</div>
+            <p>Belum ada kegiatan yang dicatat</p>
+            <button class="btn btn-primary mt-4" id="btnTambahKegiatan2">+ Tambah Kegiatan</button>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Detail panel -->
+  <div class="detail-overlay" id="detailOverlay">
+    <div class="detail-panel" id="detailPanel">
+      <div class="detail-panel-head">
+        <div class="flex-between">
+          <div>
+            <h2 id="detailNama"></h2>
+            <p id="detailInfo"></p>
+          </div>
+          <button class="detail-close" onclick="tutupDetail()">✕</button>
+        </div>
+        <!-- Progress bar -->
+        <div style="margin-top:1rem">
+          <div style="display:flex;justify-content:space-between;margin-bottom:.35rem">
+            <span style="color:var(--emerald-200);font-size:.8rem">Progress Pembayaran</span>
+            <span style="color:white;font-size:.8rem;font-weight:700" id="detailPct">0%</span>
+          </div>
+          <div class="progress">
+            <div class="progress-bar" id="detailProgressBar" style="width:0%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:.35rem">
+            <span style="color:var(--emerald-300);font-size:.75rem" id="detailLunasTxt"></span>
+            <span style="color:var(--emerald-300);font-size:.75rem" id="detailTotalTxt"></span>
+          </div>
+        </div>
+      </div>
+      <div style="padding:1.25rem">
+        <div class="filter-bar" style="margin-bottom:1rem">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="form-control" id="searchSiswaKegiatan" placeholder="Cari siswa..." />
+          </div>
+          <select class="form-control" id="filterStatusKegiatan" style="width:auto;min-width:140px">
+            <option value="">Semua Status</option>
+            <option value="lunas">Sudah Bayar</option>
+            <option value="belum">Belum Bayar</option>
+          </select>
+        </div>
+        <div id="detailSiswaList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Kegiatan -->
+  <div class="modal-overlay" id="modalKegiatan">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalKegiatanJudul">Tambah Kegiatan</h3>
+        <button class="modal-close" onclick="Utils.tutupModal('modalKegiatan')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="formKegiatan">
+          <input type="hidden" id="kegiatanId" />
+          <div class="form-group">
+            <label>Nama Kegiatan <span class="required">*</span></label>
+            <input type="text" class="form-control" id="kgNama" placeholder="Renang, Study Tour, dll" required />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nominal (Rp) <span class="required">*</span></label>
+              <input type="number" class="form-control" id="kgNominal" placeholder="50000" min="0" required />
+            </div>
+            <div class="form-group">
+              <label>Tanggal Kegiatan <span class="required">*</span></label>
+              <input type="date" class="form-control" id="kgTgl" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Deskripsi</label>
+            <textarea class="form-control" id="kgDeskripsi" rows="2" placeholder="Keterangan tambahan..."></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="Utils.tutupModal('modalKegiatan')">Batal</button>
+        <button class="btn btn-primary" id="btnSimpanKegiatan">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script>
+    Layout.init('kegiatan');
+
+    if (!DB.isBendahara()) {
+      document.getElementById('btnTambahKegiatan').classList.add('d-none');
+    }
+
+    let activeKgId = null;
+
+    // ── Render daftar kegiatan ─────────────────────────────────
+    function renderKegiatan() {
+      const list  = DB.getKegiatan();
+      const siswa = DB.getSiswa().filter(s => s.role === 'siswa' && s.aktif);
+
+      if (list.length === 0) {
+        document.getElementById('kegiatanGrid').classList.add('d-none');
+        document.getElementById('emptyKegiatan').classList.remove('d-none');
+        return;
+      }
+      document.getElementById('kegiatanGrid').classList.remove('d-none');
+      document.getElementById('emptyKegiatan').classList.add('d-none');
+
+      document.getElementById('kegiatanGrid').innerHTML = list.map(kg => {
+        const bayar  = DB.getKgBayar(kg.id);
+        const total  = siswa.length;
+        const lunas  = Object.values(bayar).filter(b => b.status === 'lunas').length;
+        const belum  = total - lunas;
+        const pct    = total ? Math.round(lunas / total * 100) : 0;
+        const terkumpul = lunas * kg.nominal;
+
+        const aksiHTML = DB.isBendahara() ? `
+          <button class="btn btn-sm btn-outline" onclick="editKegiatan('${kg.id}');event.stopPropagation()">✏️ Edit</button>
+          <button class="btn btn-sm btn-danger"  onclick="hapusKegiatan('${kg.id}');event.stopPropagation()">🗑️</button>` : '';
+
+        return `
+          <div class="kegiatan-card" onclick="bukaDetail('${kg.id}')" style="cursor:pointer">
+            <div class="kegiatan-card-head">
+              <div>
+                <h3>🎯 ${kg.nama}</h3>
+                <p>📅 ${Utils.tglIndo(kg.tgl)}</p>
+                ${kg.deskripsi ? `<p style="margin-top:.25rem">${kg.deskripsi}</p>` : ''}
+              </div>
+              <span class="kegiatan-nominal">${Utils.rupiah(kg.nominal)}</span>
+            </div>
+            <div class="kegiatan-card-body">
+              <div class="kegiatan-stat">
+                <span class="label">Sudah Bayar</span>
+                <span class="val text-green">${lunas} siswa</span>
+              </div>
+              <div class="kegiatan-stat">
+                <span class="label">Belum Bayar</span>
+                <span class="val text-red">${belum} siswa</span>
+              </div>
+              <div class="kegiatan-stat">
+                <span class="label">Terkumpul</span>
+                <span class="val text-gold">${Utils.rupiah(terkumpul)}</span>
+              </div>
+              <div class="progress" style="margin-top:.5rem">
+                <div class="progress-bar" style="width:${pct}%"></div>
+              </div>
+              <div style="text-align:right;font-size:.75rem;color:var(--emerald-600);font-weight:600;margin-top:.25rem">${pct}%</div>
+            </div>
+            <div class="kegiatan-actions">
+              <button class="btn btn-sm btn-primary" onclick="bukaDetail('${kg.id}');event.stopPropagation()">👁 Lihat Detail</button>
+              ${aksiHTML}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ── Detail panel ───────────────────────────────────────────
+    function bukaDetail(kgId) {
+      activeKgId = kgId;
+      renderDetail();
+      document.getElementById('detailOverlay').classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+    function tutupDetail() {
+      document.getElementById('detailOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+      activeKgId = null;
+    }
+
+    function renderDetail() {
+      const kg    = DB.getKegiatanById(activeKgId);
+      const bayar = DB.getKgBayar(activeKgId);
+      const siswa = DB.getSiswa().filter(s => s.role === 'siswa' && s.aktif);
+      const total = siswa.length;
+      const lunas = Object.values(bayar).filter(b => b.status === 'lunas').length;
+      const pct   = total ? Math.round(lunas / total * 100) : 0;
+
+      document.getElementById('detailNama').textContent = kg.nama;
+      document.getElementById('detailInfo').textContent = `${Utils.tglIndo(kg.tgl)} · ${Utils.rupiah(kg.nominal)} per siswa`;
+      document.getElementById('detailPct').textContent  = `${pct}%`;
+      document.getElementById('detailProgressBar').style.width = `${pct}%`;
+      document.getElementById('detailLunasTxt').textContent    = `${lunas} sudah bayar`;
+      document.getElementById('detailTotalTxt').textContent    = `dari ${total} siswa`;
+
+      renderDetailList();
+    }
+
+    function renderDetailList() {
+      const kg     = DB.getKegiatanById(activeKgId);
+      const bayar  = DB.getKgBayar(activeKgId);
+      const q      = document.getElementById('searchSiswaKegiatan').value.toLowerCase();
+      const filter = document.getElementById('filterStatusKegiatan').value;
+      const canEdit = DB.isBendahara();
+
+      let siswa = DB.getSiswa().filter(s => s.role === 'siswa' && s.aktif);
+      siswa = siswa.filter(s => {
+        const status = bayar[s.id]?.status || 'belum';
+        return (!q      || s.nama.toLowerCase().includes(q))
+            && (!filter || status === filter);
+      });
+
+      if (siswa.length === 0) {
+        document.getElementById('detailSiswaList').innerHTML =
+          '<div class="empty-state"><div class="empty-icon">👥</div><p>Tidak ada siswa yang cocok</p></div>';
+        return;
+      }
+
+      document.getElementById('detailSiswaList').innerHTML = siswa.map((s, idx) => {
+        const rec    = bayar[s.id] || { status: 'belum', tglBayar: null };
+        const status = rec.status || 'belum';
+        const cls    = status === 'lunas' ? 'toggle-bayar--lunas' : 'toggle-bayar--belum';
+        const label  = status === 'lunas' ? '✓ Sudah Bayar' : '○ Belum Bayar';
+
+        return `
+          <div class="siswa-row">
+            <span class="siswa-row-no">${String(idx+1).padStart(2,'0')}</span>
+            <div class="siswa-row-avatar">${Utils.avatar(s.nama)}</div>
+            <div class="siswa-row-info">
+              <strong>${s.nama}</strong>
+              <span>NIS: ${s.nis}${status==='lunas'?' · '+Utils.tglIndo(rec.tglBayar):''}</span>
+            </div>
+            <button class="toggle-bayar ${cls}"
+              ${canEdit ? `onclick="toggleKgBayar('${activeKgId}','${s.id}','${status}')"` : 'disabled'}
+            >${label}</button>
+          </div>`;
+      }).join('');
+    }
+
+    function toggleKgBayar(kgId, siswaId, status) {
+      if (!Utils.requireBendahara()) return;
+      const newStatus = status === 'lunas' ? 'belum' : 'lunas';
+      DB.updateKgBayar(kgId, siswaId, newStatus);
+      renderDetail();
+      renderKegiatan();
+      Utils.toast(newStatus === 'lunas' ? 'Ditandai sudah bayar ✓' : 'Ditandai belum bayar');
+    }
+
+    // ── CRUD Kegiatan ──────────────────────────────────────────
+    let editKgId = null;
+
+    function bukaModalKegiatan() {
+      editKgId = null;
+      document.getElementById('modalKegiatanJudul').textContent = 'Tambah Kegiatan Baru';
+      document.getElementById('formKegiatan').reset();
+      document.getElementById('kegiatanId').value = '';
+      document.getElementById('kgTgl').value = new Date().toISOString().split('T')[0];
+      Utils.bukaModal('modalKegiatan');
+    }
+
+    document.getElementById('btnTambahKegiatan').onclick = bukaModalKegiatan;
+    document.getElementById('btnTambahKegiatan2')?.addEventListener('click', bukaModalKegiatan);
+
+    function editKegiatan(id) {
+      if (!Utils.requireBendahara()) return;
+      editKgId = id;
+      const kg = DB.getKegiatanById(id);
+      document.getElementById('modalKegiatanJudul').textContent = 'Edit Kegiatan';
+      document.getElementById('kegiatanId').value = kg.id;
+      document.getElementById('kgNama').value      = kg.nama;
+      document.getElementById('kgNominal').value   = kg.nominal;
+      document.getElementById('kgTgl').value       = kg.tgl;
+      document.getElementById('kgDeskripsi').value = kg.deskripsi || '';
+      Utils.bukaModal('modalKegiatan');
+    }
+
+    async function hapusKegiatan(id) {
+      if (!Utils.requireBendahara()) return;
+      const kg = DB.getKegiatanById(id);
+      const ok = await Utils.konfirmasi('Hapus Kegiatan', `Hapus kegiatan <strong>${kg.nama}</strong> beserta semua data pembayarannya?`);
+      if (!ok) return;
+      DB.hapusKegiatan(id);
+      Utils.toast('Kegiatan berhasil dihapus.');
+      renderKegiatan();
+    }
+
+    document.getElementById('btnSimpanKegiatan').onclick = () => {
+      if (!Utils.requireBendahara()) return;
+      const data = {
+        nama:      document.getElementById('kgNama').value.trim(),
+        nominal:   parseFloat(document.getElementById('kgNominal').value) || 0,
+        tgl:       document.getElementById('kgTgl').value,
+        deskripsi: document.getElementById('kgDeskripsi').value.trim(),
+      };
+      if (!data.nama || !data.nominal || !data.tgl) { Utils.toast('Lengkapi data kegiatan.', 'error'); return; }
+
+      if (editKgId) {
+        DB.updateKegiatan(editKgId, data);
+        Utils.toast('Kegiatan diperbarui.');
+      } else {
+        DB.tambahKegiatan(data);
+        Utils.toast('Kegiatan baru ditambahkan.');
+      }
+      Utils.tutupModal('modalKegiatan');
+      renderKegiatan();
+    };
+
+    // Filter detail realtime
+    document.getElementById('searchSiswaKegiatan').addEventListener('input', renderDetailList);
+    document.getElementById('filterStatusKegiatan').addEventListener('change', renderDetailList);
+
+    // Tutup detail dengan klik overlay
+    document.getElementById('detailOverlay').addEventListener('click', e => {
+      if (e.target === document.getElementById('detailOverlay')) tutupDetail();
+    });
+
+    renderKegiatan();
+  </script>
+</body>
+</html>

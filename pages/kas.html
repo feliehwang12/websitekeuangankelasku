@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kas Kelas — Keuangan Kelasku</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .kas-header-grid {
+      display: grid;
+      grid-template-columns: repeat(3,1fr);
+      gap: 1rem; margin-bottom: 1.5rem;
+    }
+    @media(max-width:600px){ .kas-header-grid{ grid-template-columns:1fr; } }
+
+    .kas-summary {
+      background: white; border-radius: var(--radius-lg);
+      padding: 1.25rem; text-align: center;
+      box-shadow: var(--shadow); border-top: 4px solid;
+    }
+    .kas-summary--green { border-color: var(--emerald-500); }
+    .kas-summary--red   { border-color: var(--red-500); }
+    .kas-summary--gold  { border-color: var(--gold-500); }
+    .kas-summary p   { font-size: .78rem; color: var(--gray-500); font-weight: 500; margin-bottom: .25rem; }
+    .kas-summary h3  { font-size: 1.5rem; font-weight: 800; }
+    .kas-summary--green h3 { color: var(--emerald-600); }
+    .kas-summary--red h3   { color: var(--red-500); }
+    .kas-summary--gold h3  { color: var(--gold-600); }
+
+    /* Iuran matrix */
+    .iuran-table th, .iuran-table td { padding: .55rem .75rem; font-size: .8rem; }
+    .iuran-table .nama-col { max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .btn-iuran {
+      width: 30px; height: 30px;
+      border-radius: var(--radius-full);
+      border: 2px solid; cursor: pointer;
+      font-size: .75rem; font-weight: 700;
+      transition: var(--transition);
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .btn-iuran--lunas  { background: var(--emerald-500); border-color: var(--emerald-500); color: white; }
+    .btn-iuran--belum  { background: white; border-color: var(--gray-300); color: var(--gray-400); }
+    .btn-iuran--belum:hover { border-color: var(--emerald-400); color: var(--emerald-500); }
+    .btn-iuran:disabled { cursor: default; }
+    .sticky-col { position: sticky; left: 0; background: white; z-index: 2; }
+    .sticky-head { position: sticky; left: 0; background: var(--emerald-800); z-index: 3; }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar" id="appSidebar"></aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div class="main-content">
+      <header class="topbar" id="appTopbar"></header>
+      <main class="page-content">
+
+        <div class="page-header">
+          <div class="page-header-text">
+            <h2>Kas Kelas</h2>
+            <p>Pencatatan transaksi pemasukan, pengeluaran, dan iuran siswa</p>
+          </div>
+          <div style="display:flex;gap:.75rem;flex-wrap:wrap" id="kasHeaderActions">
+            <button class="btn btn-primary" id="btnTambahTransaksi">+ Transaksi</button>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="kas-header-grid" id="kasSummary"></div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab('transaksi')">💵 Transaksi</button>
+          <button class="tab-btn" onclick="switchTab('iuran')">📅 Iuran Siswa</button>
+        </div>
+
+        <!-- Tab: Transaksi -->
+        <div class="tab-panel active" id="tab-transaksi">
+          <div class="filter-bar">
+            <div class="search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" class="form-control" id="searchTrx" placeholder="Cari keterangan..." />
+            </div>
+            <select class="form-control" id="filterJenis" style="width:auto;min-width:130px">
+              <option value="">Semua Jenis</option>
+              <option value="masuk">Pemasukan</option>
+              <option value="keluar">Pengeluaran</option>
+            </select>
+            <select class="form-control" id="filterKategori" style="width:auto;min-width:150px">
+              <option value="">Semua Kategori</option>
+            </select>
+          </div>
+          <div class="card">
+            <div class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Keterangan</th>
+                    <th>Kategori</th>
+                    <th>Jenis</th>
+                    <th>Nominal</th>
+                    <th id="thTrxAksi">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="trxTableBody"></tbody>
+                <tfoot id="trxFooter"></tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Iuran -->
+        <div class="tab-panel" id="tab-iuran">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem;">
+            <p class="text-sm text-muted">Klik tombol bulat untuk toggle status bayar. Hijau = Lunas.</p>
+            <button class="btn btn-outline btn-sm" id="btnTambahBulan">+ Tambah Bulan Iuran</button>
+          </div>
+          <div class="card">
+            <div class="table-container">
+              <table class="table iuran-table" id="iuranTable">
+                <thead id="iuranHead"></thead>
+                <tbody id="iuranBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal Transaksi -->
+  <div class="modal-overlay" id="modalTrx">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTrxJudul">Tambah Transaksi</h3>
+        <button class="modal-close" onclick="Utils.tutupModal('modalTrx')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="formTrx">
+          <input type="hidden" id="trxId" />
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tanggal <span class="required">*</span></label>
+              <input type="date" class="form-control" id="trxTgl" required />
+            </div>
+            <div class="form-group">
+              <label>Jenis <span class="required">*</span></label>
+              <select class="form-control" id="trxJenis">
+                <option value="masuk">Pemasukan</option>
+                <option value="keluar">Pengeluaran</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Keterangan <span class="required">*</span></label>
+            <input type="text" class="form-control" id="trxKet" placeholder="Deskripsi transaksi" required />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Kategori <span class="required">*</span></label>
+              <input type="text" class="form-control" id="trxKategori" placeholder="iuran / snack / dll" list="kategoriList" required />
+              <datalist id="kategoriList">
+                <option value="iuran"><option value="snack"><option value="kebersihan">
+                <option value="dekorasi"><option value="fotocopy"><option value="lainnya">
+              </datalist>
+            </div>
+            <div class="form-group">
+              <label>Nominal (Rp) <span class="required">*</span></label>
+              <input type="number" class="form-control" id="trxNominal" placeholder="0" min="0" required />
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="Utils.tutupModal('modalTrx')">Batal</button>
+        <button class="btn btn-primary" id="btnSimpanTrx">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Tambah Bulan Iuran -->
+  <div class="modal-overlay" id="modalBulanIuran">
+    <div class="modal" style="max-width:380px">
+      <div class="modal-header">
+        <h3>Tambah Bulan Iuran</h3>
+        <button class="modal-close" onclick="Utils.tutupModal('modalBulanIuran')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Bulan <span class="required">*</span></label>
+          <input type="month" class="form-control" id="bulanIuranField" />
+        </div>
+        <div class="form-group">
+          <label>Nominal Iuran (Rp) <span class="required">*</span></label>
+          <input type="number" class="form-control" id="nominalIuranField" value="10000" min="0" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="Utils.tutupModal('modalBulanIuran')">Batal</button>
+        <button class="btn btn-primary" id="btnSimpanBulanIuran">Tambah</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script>
+    Layout.init('kas');
+
+    // Hide aksi jika bukan bendahara
+    if (!DB.isBendahara()) {
+      document.getElementById('btnTambahTransaksi').classList.add('d-none');
+      document.getElementById('btnTambahBulan').classList.add('d-none');
+    }
+
+    // ── Render summary ─────────────────────────────────────────
+    function renderSummary() {
+      const saldo  = DB.getSaldo();
+      const masuk  = DB.getTotalMasuk();
+      const keluar = DB.getTotalKeluar();
+      document.getElementById('kasSummary').innerHTML = `
+        <div class="kas-summary kas-summary--gold">
+          <p>💰 Saldo Kas</p>
+          <h3>${Utils.rupiah(saldo)}</h3>
+        </div>
+        <div class="kas-summary kas-summary--green">
+          <p>📈 Total Masuk</p>
+          <h3>${Utils.rupiah(masuk)}</h3>
+        </div>
+        <div class="kas-summary kas-summary--red">
+          <p>📉 Total Keluar</p>
+          <h3>${Utils.rupiah(keluar)}</h3>
+        </div>
+      `;
+    }
+
+    // ── Render transaksi ───────────────────────────────────────
+    function renderTrx() {
+      const q     = document.getElementById('searchTrx').value.toLowerCase();
+      const jenis = document.getElementById('filterJenis').value;
+      const kat   = document.getElementById('filterKategori').value;
+
+      let list = DB.getTransaksi().filter(t => {
+        return (!q    || t.keterangan.toLowerCase().includes(q))
+            && (!jenis || t.jenis === jenis)
+            && (!kat   || t.kategori === kat);
+      }).sort((a,b) => new Date(b.tgl) - new Date(a.tgl));
+
+      // Populate kategori filter
+      const kats = [...new Set(DB.getTransaksi().map(t => t.kategori))];
+      const selKat = document.getElementById('filterKategori');
+      const curKat = selKat.value;
+      selKat.innerHTML = '<option value="">Semua Kategori</option>' +
+        kats.map(k => `<option value="${k}" ${k===curKat?'selected':''}>${k}</option>`).join('');
+
+      const html = list.length === 0
+        ? `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--gray-400)">Tidak ada transaksi</td></tr>`
+        : list.map(t => {
+            const aksi = DB.isBendahara() ? `
+              <button class="btn btn-sm btn-outline" onclick="editTrx('${t.id}')">✏️</button>
+              <button class="btn btn-sm btn-danger" onclick="hapusTrx('${t.id}')">🗑️</button>` : '-';
+            return `
+              <tr>
+                <td data-label="Tanggal">${Utils.tglIndo(t.tgl)}</td>
+                <td data-label="Keterangan">${t.keterangan}</td>
+                <td data-label="Kategori"><span class="badge badge--gray">${t.kategori}</span></td>
+                <td data-label="Jenis">
+                  <span class="badge ${t.jenis==='masuk'?'badge--sukses':'badge--danger'}">
+                    ${t.jenis==='masuk'?'⬆ Masuk':'⬇ Keluar'}
+                  </span>
+                </td>
+                <td data-label="Nominal" class="${t.jenis==='masuk'?'text-green':'text-red'}" style="font-weight:600">
+                  ${t.jenis==='masuk'?'+':'-'}${Utils.rupiah(t.nominal)}
+                </td>
+                <td data-label="Aksi" style="display:flex;gap:.35rem">${aksi}</td>
+              </tr>`;
+          }).join('');
+
+      const totalMasuk  = list.filter(t=>t.jenis==='masuk').reduce((a,t)=>a+t.nominal,0);
+      const totalKeluar = list.filter(t=>t.jenis==='keluar').reduce((a,t)=>a+t.nominal,0);
+
+      document.getElementById('trxTableBody').innerHTML = html;
+      document.getElementById('trxFooter').innerHTML = `
+        <tr>
+          <td colspan="4">Total (ditampilkan)</td>
+          <td colspan="2">
+            <span class="text-green fw-600">+${Utils.rupiah(totalMasuk)}</span>
+            &nbsp;/&nbsp;
+            <span class="text-red fw-600">-${Utils.rupiah(totalKeluar)}</span>
+          </td>
+        </tr>`;
+
+      renderSummary();
+    }
+
+    // ── Render iuran matrix ────────────────────────────────────
+    function renderIuran() {
+      const bulanList = DB.getBulanIuran();
+      const siswa     = DB.getSiswa().filter(s => s.role === 'siswa' && s.aktif);
+      const iuranAll  = DB.getIuran();
+      const canEdit   = DB.isBendahara();
+
+      if (bulanList.length === 0) {
+        document.getElementById('iuranHead').innerHTML = '';
+        document.getElementById('iuranBody').innerHTML =
+          '<tr><td colspan="2" style="text-align:center;padding:2rem;color:var(--gray-400)">Belum ada bulan iuran</td></tr>';
+        return;
+      }
+
+      // Header
+      document.getElementById('iuranHead').innerHTML = `
+        <tr>
+          <th class="sticky-head" style="min-width:140px">Nama Siswa</th>
+          ${bulanList.map(b => `<th style="text-align:center;min-width:90px">${Utils.bulanIndo(b).split(' ')[0]}<br><small>${Utils.bulanIndo(b).split(' ')[1]||''}</small></th>`).join('')}
+        </tr>`;
+
+      // Body
+      document.getElementById('iuranBody').innerHTML = siswa.map((s,idx) => {
+        const cells = bulanList.map(bln => {
+          const rec = iuranAll.find(i => i.siswaId === s.id && i.bulan === bln);
+          if (!rec) return `<td style="text-align:center">—</td>`;
+          const cls  = rec.status === 'lunas' ? 'btn-iuran--lunas' : 'btn-iuran--belum';
+          const title = rec.status === 'lunas' ? `Lunas ${Utils.tglIndo(rec.tglBayar)}` : 'Belum bayar';
+          return `<td style="text-align:center">
+            <button class="btn-iuran ${cls}" title="${title}"
+              ${canEdit ? `onclick="toggleIuran('${rec.id}','${rec.status}')"` : 'disabled'}
+            >${rec.status === 'lunas' ? '✓' : '○'}</button>
+          </td>`;
+        }).join('');
+
+        return `
+          <tr>
+            <td class="sticky-col" data-label="Nama">
+              <div style="display:flex;align-items:center;gap:.5rem">
+                <span style="color:var(--gray-400);font-size:.75rem;min-width:18px">${String(idx+1).padStart(2,'0')}</span>
+                <span style="font-weight:500">${s.nama}</span>
+              </div>
+            </td>
+            ${cells}
+          </tr>`;
+      }).join('');
+    }
+
+    function toggleIuran(id, status) {
+      if (!Utils.requireBendahara()) return;
+      const newStatus = status === 'lunas' ? 'belum' : 'lunas';
+      DB.updateIuran(id, { status: newStatus, tglBayar: newStatus === 'lunas' ? new Date().toISOString().split('T')[0] : null });
+      renderIuran();
+      renderSummary();
+      Utils.toast(newStatus === 'lunas' ? 'Ditandai lunas ✓' : 'Ditandai belum bayar');
+    }
+
+    // ── Tabs ───────────────────────────────────────────────────
+    function switchTab(id) {
+      document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      const tabs = ['transaksi','iuran'];
+      const idx  = tabs.indexOf(id);
+      document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+      document.getElementById('tab-'+id).classList.add('active');
+    }
+
+    // ── CRUD Transaksi ─────────────────────────────────────────
+    let editTrxId = null;
+
+    document.getElementById('btnTambahTransaksi').onclick = () => {
+      editTrxId = null;
+      document.getElementById('modalTrxJudul').textContent = 'Tambah Transaksi';
+      document.getElementById('formTrx').reset();
+      document.getElementById('trxId').value = '';
+      document.getElementById('trxTgl').value = new Date().toISOString().split('T')[0];
+      Utils.bukaModal('modalTrx');
+    };
+
+    function editTrx(id) {
+      if (!Utils.requireBendahara()) return;
+      editTrxId = id;
+      const t = DB.getTransaksi().find(x => x.id === id);
+      document.getElementById('modalTrxJudul').textContent = 'Edit Transaksi';
+      document.getElementById('trxId').value       = t.id;
+      document.getElementById('trxTgl').value      = t.tgl;
+      document.getElementById('trxJenis').value    = t.jenis;
+      document.getElementById('trxKet').value      = t.keterangan;
+      document.getElementById('trxKategori').value = t.kategori;
+      document.getElementById('trxNominal').value  = t.nominal;
+      Utils.bukaModal('modalTrx');
+    }
+
+    async function hapusTrx(id) {
+      if (!Utils.requireBendahara()) return;
+      const ok = await Utils.konfirmasi('Hapus Transaksi', 'Hapus transaksi ini?');
+      if (!ok) return;
+      DB.hapusTransaksi(id);
+      Utils.toast('Transaksi berhasil dihapus.');
+      renderTrx();
+    }
+
+    document.getElementById('btnSimpanTrx').onclick = () => {
+      if (!Utils.requireBendahara()) return;
+      const data = {
+        tgl:         document.getElementById('trxTgl').value,
+        jenis:       document.getElementById('trxJenis').value,
+        keterangan:  document.getElementById('trxKet').value.trim(),
+        kategori:    document.getElementById('trxKategori').value.trim(),
+        nominal:     parseFloat(document.getElementById('trxNominal').value) || 0,
+      };
+      if (!data.tgl || !data.keterangan || !data.kategori || !data.nominal) {
+        Utils.toast('Lengkapi semua field.', 'error'); return;
+      }
+      if (editTrxId) {
+        DB.updateTransaksi(editTrxId, data);
+        Utils.toast('Transaksi diperbarui.');
+      } else {
+        DB.tambahTransaksi(data);
+        Utils.toast('Transaksi berhasil disimpan.');
+      }
+      Utils.tutupModal('modalTrx');
+      renderTrx();
+    };
+
+    // ── Tambah Bulan Iuran ─────────────────────────────────────
+    document.getElementById('btnTambahBulan').onclick = () => {
+      document.getElementById('bulanIuranField').value = new Date().toISOString().slice(0,7);
+      Utils.bukaModal('modalBulanIuran');
+    };
+    document.getElementById('btnSimpanBulanIuran').onclick = () => {
+      if (!Utils.requireBendahara()) return;
+      const bln     = document.getElementById('bulanIuranField').value;
+      const nominal = parseFloat(document.getElementById('nominalIuranField').value) || 10000;
+      if (!bln) { Utils.toast('Pilih bulan.', 'error'); return; }
+      DB.tambahBulanIuran(bln, nominal);
+      Utils.toast('Bulan iuran berhasil ditambahkan.');
+      Utils.tutupModal('modalBulanIuran');
+      renderIuran();
+    };
+
+    // ── Init ───────────────────────────────────────────────────
+    document.getElementById('searchTrx').addEventListener('input', renderTrx);
+    document.getElementById('filterJenis').addEventListener('change', renderTrx);
+    document.getElementById('filterKategori').addEventListener('change', renderTrx);
+
+    renderSummary();
+    renderTrx();
+    renderIuran();
+  </script>
+</body>
+</html>

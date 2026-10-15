@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data Siswa — Keuangan Kelasku</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .siswa-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+    .siswa-card {
+      background: white;
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      box-shadow: var(--shadow);
+      display: flex; align-items: center; gap: 1rem;
+      transition: var(--transition);
+      border: 2px solid transparent;
+      position: relative;
+    }
+    .siswa-card:hover { box-shadow: var(--shadow-md); border-color: var(--emerald-200); transform: translateY(-2px); }
+    .siswa-card--bendahara { border-color: var(--gold-400); background: linear-gradient(135deg, #fffbeb, white); }
+    .siswa-avatar {
+      width: 48px; height: 48px;
+      border-radius: var(--radius-full);
+      background: linear-gradient(135deg, var(--emerald-400), var(--emerald-700));
+      color: white; font-weight: 700; font-size: .95rem;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .siswa-avatar--bendahara { background: linear-gradient(135deg, var(--gold-400), var(--gold-600)); }
+    .siswa-info { flex: 1; min-width: 0; }
+    .siswa-info strong { display: block; font-size: .9rem; color: var(--gray-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .siswa-info span   { font-size: .78rem; color: var(--gray-500); }
+    .siswa-no {
+      position: absolute; top: .6rem; right: .8rem;
+      font-size: .7rem; font-weight: 700; color: var(--gray-400);
+    }
+    .siswa-actions { display: flex; gap: .35rem; margin-top: .5rem; }
+    .crown { position: absolute; top: -.3rem; right: 1.5rem; font-size: .875rem; }
+
+    /* Tabel view (alternatif) */
+    .view-toggle { display: flex; gap: .5rem; }
+    .view-btn { background: var(--gray-100); border: 1.5px solid var(--gray-200); border-radius: var(--radius); padding: .4rem .75rem; cursor: pointer; font-size: .875rem; transition: var(--transition); }
+    .view-btn.active { background: var(--emerald-600); color: white; border-color: var(--emerald-600); }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar" id="appSidebar"></aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="main-content">
+      <header class="topbar" id="appTopbar"></header>
+      <main class="page-content">
+
+        <div class="page-header">
+          <div class="page-header-text">
+            <h2>Data Siswa</h2>
+            <p>Daftar lengkap siswa seperti absensi kelas</p>
+          </div>
+          <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
+            <div class="view-toggle">
+              <button class="view-btn active" id="btnGrid" onclick="setView('grid')">⊞ Grid</button>
+              <button class="view-btn" id="btnTable" onclick="setView('table')">☰ Tabel</button>
+            </div>
+            <button class="btn btn-primary" id="btnTambahSiswa">+ Tambah Siswa</button>
+          </div>
+        </div>
+
+        <!-- Filter -->
+        <div class="filter-bar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="form-control" id="searchSiswa" placeholder="Cari nama atau NIS..." />
+          </div>
+          <select class="form-control" id="filterRole" style="width:auto;min-width:140px">
+            <option value="">Semua Peran</option>
+            <option value="siswa">Siswa</option>
+            <option value="bendahara">Bendahara</option>
+          </select>
+        </div>
+
+        <!-- Summary chips -->
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;" id="summaryChips"></div>
+
+        <!-- Grid view -->
+        <div id="viewGrid">
+          <div class="siswa-grid" id="siswaGrid"></div>
+        </div>
+
+        <!-- Table view -->
+        <div id="viewTable" class="d-none">
+          <div class="card">
+            <div class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th>NIS/NIPD</th>
+                    <th>Nama Lengkap</th>
+                    <th>Peran</th>
+                    <th>Status</th>
+                    <th id="thAksi">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="siswaTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal Tambah/Edit Siswa -->
+  <div class="modal-overlay" id="modalSiswa">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalSiswaJudul">Tambah Siswa</h3>
+        <button class="modal-close" onclick="Utils.tutupModal('modalSiswa')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="formSiswa">
+          <input type="hidden" id="siswaId" />
+          <div class="form-row">
+            <div class="form-group">
+              <label>NIS/NIPD <span class="required">*</span></label>
+              <input type="text" class="form-control" id="siswaFieldNis" placeholder="contoh: 0016" required />
+            </div>
+            <div class="form-group">
+              <label>Peran <span class="required">*</span></label>
+              <select class="form-control" id="siswaFieldRole">
+                <option value="siswa">Siswa</option>
+                <option value="bendahara">Bendahara</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Nama Lengkap <span class="required">*</span></label>
+            <input type="text" class="form-control" id="siswaFieldNama" placeholder="Nama lengkap siswa" required />
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select class="form-control" id="siswaFieldAktif">
+              <option value="1">Aktif</option>
+              <option value="0">Non-aktif</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="Utils.tutupModal('modalSiswa')">Batal</button>
+        <button class="btn btn-primary" id="btnSimpanSiswa">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script>
+    Layout.init('siswa');
+    let viewMode = 'grid';
+    let editId   = null;
+
+    // Sembunyikan tombol aksi jika bukan bendahara
+    if (!DB.isBendahara()) {
+      document.getElementById('btnTambahSiswa').classList.add('d-none');
+    }
+
+    function renderSummary() {
+      const semua    = DB.getSiswa();
+      const aktif    = semua.filter(s => s.aktif && s.role === 'siswa').length;
+      const bendahara = semua.filter(s => s.role === 'bendahara').length;
+      document.getElementById('summaryChips').innerHTML = `
+        <div class="chip">👥 ${semua.length} Total</div>
+        <div class="chip">🎓 ${aktif} Siswa Aktif</div>
+        <div class="chip">💼 ${bendahara} Bendahara</div>
+      `;
+    }
+
+    function getFiltered() {
+      const q    = document.getElementById('searchSiswa').value.toLowerCase();
+      const role = document.getElementById('filterRole').value;
+      return DB.getSiswa().filter(s => {
+        const matchQ    = s.nama.toLowerCase().includes(q) || s.nis.includes(q);
+        const matchRole = role ? s.role === role : true;
+        return matchQ && matchRole;
+      });
+    }
+
+    function renderGrid() {
+      const list = getFiltered();
+      const html = list.length === 0
+        ? `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">👤</div><p>Tidak ada data siswa</p></div>`
+        : list.map((s, i) => {
+            const isBend = s.role === 'bendahara';
+            const aksiHTML = DB.isBendahara() ? `
+              <div class="siswa-actions">
+                <button class="btn btn-sm btn-outline" onclick="editSiswa('${s.id}')">✏️ Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="hapusSiswa('${s.id}')">🗑️</button>
+              </div>` : '';
+            return `
+              <div class="siswa-card ${isBend ? 'siswa-card--bendahara' : ''}">
+                ${isBend ? '<span class="crown">👑</span>' : ''}
+                <div class="siswa-avatar ${isBend ? 'siswa-avatar--bendahara' : ''}">${Utils.avatar(s.nama)}</div>
+                <div class="siswa-info">
+                  <strong>${s.nama}</strong>
+                  <span>NIS: ${s.nis} · ${isBend ? '💼 Bendahara' : '🎓 Siswa'}</span>
+                  <span class="badge ${s.aktif ? 'badge--sukses' : 'badge--gray'}" style="margin-top:.35rem">
+                    ${s.aktif ? 'Aktif' : 'Non-aktif'}
+                  </span>
+                  ${aksiHTML}
+                </div>
+                <div class="siswa-no">#${String(i+1).padStart(2,'0')}</div>
+              </div>`;
+          }).join('');
+      document.getElementById('siswaGrid').innerHTML = html;
+    }
+
+    function renderTable() {
+      const list = getFiltered();
+      const tbody = list.map((s, i) => {
+        const isBend = s.role === 'bendahara';
+        const aksiHTML = DB.isBendahara() ? `
+          <button class="btn btn-sm btn-outline" onclick="editSiswa('${s.id}')">✏️</button>
+          <button class="btn btn-sm btn-danger" onclick="hapusSiswa('${s.id}')">🗑️</button>` : '-';
+        return `
+          <tr>
+            <td data-label="No">${String(i+1).padStart(2,'0')}</td>
+            <td data-label="NIS">${s.nis}</td>
+            <td data-label="Nama">${isBend ? '👑 ' : ''}${s.nama}</td>
+            <td data-label="Peran"><span class="badge ${isBend ? 'badge--warning' : 'badge--info'}">${isBend ? 'Bendahara' : 'Siswa'}</span></td>
+            <td data-label="Status"><span class="badge ${s.aktif ? 'badge--sukses' : 'badge--gray'}">${s.aktif ? 'Aktif' : 'Non-aktif'}</span></td>
+            <td data-label="Aksi" style="display:flex;gap:.35rem">${aksiHTML}</td>
+          </tr>`;
+      }).join('');
+      document.getElementById('siswaTableBody').innerHTML = tbody ||
+        '<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--gray-400)">Tidak ada data</td></tr>';
+    }
+
+    function render() { renderGrid(); renderTable(); renderSummary(); }
+    render();
+
+    function setView(v) {
+      viewMode = v;
+      document.getElementById('viewGrid').classList.toggle('d-none', v !== 'grid');
+      document.getElementById('viewTable').classList.toggle('d-none', v !== 'table');
+      document.getElementById('btnGrid').classList.toggle('active', v === 'grid');
+      document.getElementById('btnTable').classList.toggle('active', v === 'table');
+    }
+
+    // Search/filter realtime
+    document.getElementById('searchSiswa').addEventListener('input', render);
+    document.getElementById('filterRole').addEventListener('change', render);
+
+    // Tambah
+    document.getElementById('btnTambahSiswa').onclick = () => {
+      editId = null;
+      document.getElementById('modalSiswaJudul').textContent = 'Tambah Siswa Baru';
+      document.getElementById('formSiswa').reset();
+      document.getElementById('siswaId').value = '';
+      Utils.bukaModal('modalSiswa');
+    };
+
+    // Edit
+    function editSiswa(id) {
+      if (!Utils.requireBendahara()) return;
+      editId = id;
+      const s = DB.getSiswaById(id);
+      document.getElementById('modalSiswaJudul').textContent = 'Edit Data Siswa';
+      document.getElementById('siswaId').value   = s.id;
+      document.getElementById('siswaFieldNis').value  = s.nis;
+      document.getElementById('siswaFieldNama').value = s.nama;
+      document.getElementById('siswaFieldRole').value = s.role;
+      document.getElementById('siswaFieldAktif').value = s.aktif ? '1' : '0';
+      Utils.bukaModal('modalSiswa');
+    }
+
+    // Hapus
+    async function hapusSiswa(id) {
+      if (!Utils.requireBendahara()) return;
+      const s   = DB.getSiswaById(id);
+      const ok  = await Utils.konfirmasi('Hapus Siswa', `Hapus data <strong>${s.nama}</strong>?`);
+      if (!ok) return;
+      DB.hapusSiswa(id);
+      Utils.toast('Data siswa berhasil dihapus.');
+      render();
+    }
+
+    // Simpan
+    document.getElementById('btnSimpanSiswa').onclick = () => {
+      if (!Utils.requireBendahara()) return;
+      const nis   = document.getElementById('siswaFieldNis').value.trim();
+      const nama  = document.getElementById('siswaFieldNama').value.trim();
+      const role  = document.getElementById('siswaFieldRole').value;
+      const aktif = document.getElementById('siswaFieldAktif').value === '1';
+
+      if (!nis || !nama) { Utils.toast('NIS dan nama wajib diisi.', 'error'); return; }
+
+      if (editId) {
+        DB.updateSiswa(editId, { nis, nama, role, aktif });
+        Utils.toast('Data siswa berhasil diperbarui.');
+      } else {
+        DB.tambahSiswa({ nis, nama, role, aktif });
+        Utils.toast('Siswa baru berhasil ditambahkan.');
+      }
+      Utils.tutupModal('modalSiswa');
+      render();
+    };
+  </script>
+</body>
+</html>

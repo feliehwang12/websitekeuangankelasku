@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — Keuangan Kelasku</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/login.css" />
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+
+      <!-- Header -->
+      <div class="login-header">
+        <div class="login-logo">💰</div>
+        <h1>Keuangan Kelasku</h1>
+        <p>Sistem Pengelolaan Kas Kelas Digital</p>
+      </div>
+
+      <!-- Body -->
+      <div class="login-body">
+        <div class="login-error" id="loginError">
+          <span>⚠</span>
+          <span id="loginErrorMsg">NIS/NIPD tidak ditemukan atau tidak aktif.</span>
+        </div>
+
+        <form id="loginForm" autocomplete="off">
+          <div class="form-group">
+            <label for="inputNis">NIS / NIPD <span class="required">*</span></label>
+            <div class="login-input-wrap">
+              <span class="login-input-icon">🪪</span>
+              <input type="text" id="inputNis" class="form-control"
+                placeholder="Masukkan NIS atau NIPD kamu"
+                maxlength="20" required autofocus />
+            </div>
+          </div>
+
+          <button type="submit" class="btn-login" id="btnLogin">
+            <div class="spinner"></div>
+            <span>Masuk ke Aplikasi</span>
+          </button>
+        </form>
+
+        <div class="login-hint">
+          <p>💡 Akun Demo:</p>
+          <ul class="login-hint-list">
+            <li>Bendahara: NIS <strong>9999</strong></li>
+            <li>Siswa contoh: NIS <strong>0001</strong> s/d <strong>0015</strong></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="login-footer">
+        &copy; 2025 Keuangan Kelasku &bull; Versi 1.0
+      </div>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    const form   = document.getElementById('loginForm');
+    const errBox = document.getElementById('loginError');
+    const errMsg = document.getElementById('loginErrorMsg');
+    const btn    = document.getElementById('btnLogin');
+
+    // Kalau sudah login, langsung ke dashboard
+    if (DB.getSesi() && DB.getSesi().siswaId) {
+      window.location.href = 'pages/dashboard.html';
+    }
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      errBox.classList.remove('show');
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      const nis = document.getElementById('inputNis').value.trim();
+
+      // Simulasi delay kecil agar terasa natural
+      setTimeout(() => {
+        const siswa = DB.login(nis);
+        btn.classList.remove('loading');
+        btn.disabled = false;
+
+        if (siswa) {
+          window.location.href = 'pages/dashboard.html';
+        } else {
+          errMsg.textContent = `NIS "${nis}" tidak ditemukan atau akun tidak aktif.`;
+          errBox.classList.add('show');
+          document.getElementById('inputNis').focus();
+        }
+      }, 600);
+    });
+  </script>
+</body>
+</html>

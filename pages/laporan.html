@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laporan — Keuangan Kelasku</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .laporan-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4,1fr);
+      gap: 1rem; margin-bottom: 1.5rem;
+    }
+    @media(max-width:900px){ .laporan-summary-grid{ grid-template-columns:repeat(2,1fr); } }
+    @media(max-width:480px){ .laporan-summary-grid{ grid-template-columns:1fr; } }
+
+    .laporan-summary-card {
+      background: white; border-radius: var(--radius-lg);
+      padding: 1.25rem; text-align: center;
+      box-shadow: var(--shadow); position: relative; overflow: hidden;
+    }
+    .laporan-summary-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    }
+    .ls-green::before  { background: var(--emerald-500); }
+    .ls-red::before    { background: var(--red-500); }
+    .ls-gold::before   { background: var(--gold-500); }
+    .ls-blue::before   { background: var(--blue-500); }
+    .laporan-summary-card .icon { font-size: 1.5rem; margin-bottom: .5rem; }
+    .laporan-summary-card p   { font-size: .75rem; color: var(--gray-500); font-weight: 500; margin-bottom: .25rem; }
+    .laporan-summary-card h3  { font-size: 1.25rem; font-weight: 800; color: var(--gray-900); }
+
+    /* Print styles */
+    .print-header { display: none; text-align: center; margin-bottom: 1.5rem; }
+    @media print {
+      .print-header { display: block; }
+      .no-print { display: none !important; }
+      body { background: white; }
+      .main-content { margin: 0; }
+      .page-content { padding: 0; }
+      .card { box-shadow: none; border: 1px solid #ccc; }
+      .table thead { display: table-header-group; }
+      .table tbody tr { display: table-row; }
+      .table td { display: table-cell; }
+      .table td::before { display: none; }
+    }
+
+    /* Chart bar */
+    .chart-container { padding: 1rem 0; }
+    .chart-bar-row {
+      display: flex; align-items: center; gap: .75rem; margin-bottom: .6rem;
+    }
+    .chart-bar-label { min-width: 90px; font-size: .78rem; color: var(--gray-600); text-align: right; }
+    .chart-bar-wrap  { flex: 1; background: var(--gray-100); border-radius: var(--radius-full); height: 24px; overflow: hidden; }
+    .chart-bar-fill  { height: 100%; border-radius: var(--radius-full); display: flex; align-items: center; padding-left: .5rem; transition: width .6s ease; }
+    .chart-bar-fill span { font-size: .72rem; color: white; font-weight: 600; white-space: nowrap; }
+    .chart-bar--green { background: linear-gradient(90deg, var(--emerald-500), var(--emerald-400)); }
+    .chart-bar--red   { background: linear-gradient(90deg, var(--red-500), #f87171); }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar" id="appSidebar"></aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div class="main-content">
+      <header class="topbar" id="appTopbar"></header>
+      <main class="page-content">
+
+        <!-- Print header -->
+        <div class="print-header">
+          <h1>💰 Keuangan Kelasku</h1>
+          <p>Laporan Keuangan Kas Kelas</p>
+          <p>Dicetak: <span id="printDate"></span></p>
+        </div>
+
+        <div class="page-header no-print">
+          <div class="page-header-text">
+            <h2>Laporan Keuangan</h2>
+            <p>Riwayat transaksi, rekap kas, dan rekap iuran</p>
+          </div>
+          <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+            <button class="btn btn-outline" onclick="window.print()">🖨️ Cetak</button>
+          </div>
+        </div>
+
+        <!-- Summary cards -->
+        <div class="laporan-summary-grid" id="laporanSummary"></div>
+
+        <!-- Tabs -->
+        <div class="tabs no-print">
+          <button class="tab-btn active" onclick="switchTab('riwayat')">📜 Riwayat Transaksi</button>
+          <button class="tab-btn" onclick="switchTab('iuran')">📅 Rekap Iuran</button>
+          <button class="tab-btn" onclick="switchTab('chart')">📊 Grafik</button>
+        </div>
+
+        <!-- Tab: Riwayat transaksi -->
+        <div class="tab-panel active" id="tab-riwayat">
+          <div class="filter-bar no-print">
+            <div class="search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" class="form-control" id="searchLap" placeholder="Cari keterangan atau kategori..." />
+            </div>
+            <input type="month" class="form-control" id="filterBulanLap" style="width:auto;min-width:160px" />
+            <select class="form-control" id="filterJenisLap" style="width:auto;min-width:140px">
+              <option value="">Semua Jenis</option>
+              <option value="masuk">Pemasukan</option>
+              <option value="keluar">Pengeluaran</option>
+            </select>
+            <button class="btn btn-outline btn-sm" onclick="resetFilter()">↺ Reset</button>
+          </div>
+          <div class="card">
+            <div class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th>Tanggal</th>
+                    <th>Keterangan</th>
+                    <th>Kategori</th>
+                    <th>Jenis</th>
+                    <th>Nominal</th>
+                    <th>Saldo</th>
+                  </tr>
+                </thead>
+                <tbody id="lapTableBody"></tbody>
+                <tfoot id="lapFooter"></tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Rekap iuran per bulan -->
+        <div class="tab-panel" id="tab-iuran">
+          <div class="filter-bar no-print">
+            <select class="form-control" id="filterBulanIuranLap" style="width:auto;min-width:200px">
+              <option value="">Semua Bulan</option>
+            </select>
+          </div>
+          <div class="card">
+            <div class="table-container">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th>Nama Siswa</th>
+                    <th>NIS</th>
+                    <th>Bulan</th>
+                    <th>Nominal</th>
+                    <th>Status</th>
+                    <th>Tgl Bayar</th>
+                  </tr>
+                </thead>
+                <tbody id="iuranTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Chart -->
+        <div class="tab-panel" id="tab-chart">
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-header"><h3>📈 Pemasukan per Bulan</h3></div>
+              <div class="card-body">
+                <div class="chart-container" id="chartMasuk"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3>📉 Pengeluaran per Bulan</h3></div>
+              <div class="card-body">
+                <div class="chart-container" id="chartKeluar"></div>
+              </div>
+            </div>
+          </div>
+          <div class="card mt-4">
+            <div class="card-header"><h3>📊 Rekap per Kategori</h3></div>
+            <div class="card-body">
+              <div id="chartKategori"></div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script>
+    Layout.init('laporan');
+    document.getElementById('printDate').textContent = new Date().toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+    // ── Summary ────────────────────────────────────────────────
+    function renderSummary() {
+      const trx    = DB.getTransaksi();
+      const saldo  = DB.getSaldo();
+      const masuk  = DB.getTotalMasuk();
+      const keluar = DB.getTotalKeluar();
+      const lunas  = DB.getIuran().filter(i => i.status === 'lunas').length;
+      const total  = DB.getIuran().length;
+      document.getElementById('laporanSummary').innerHTML = `
+        <div class="laporan-summary-card ls-gold">
+          <div class="icon">💰</div>
+          <p>Saldo Kas</p>
+          <h3>${Utils.rupiah(saldo)}</h3>
+        </div>
+        <div class="laporan-summary-card ls-green">
+          <div class="icon">📈</div>
+          <p>Total Pemasukan</p>
+          <h3>${Utils.rupiah(masuk)}</h3>
+        </div>
+        <div class="laporan-summary-card ls-red">
+          <div class="icon">📉</div>
+          <p>Total Pengeluaran</p>
+          <h3>${Utils.rupiah(keluar)}</h3>
+        </div>
+        <div class="laporan-summary-card ls-blue">
+          <div class="icon">✅</div>
+          <p>Iuran Lunas</p>
+          <h3>${lunas} / ${total}</h3>
+        </div>
+      `;
+    }
+
+    // ── Riwayat transaksi (dengan running saldo) ───────────────
+    function renderRiwayat() {
+      const q    = document.getElementById('searchLap').value.toLowerCase();
+      const bln  = document.getElementById('filterBulanLap').value;
+      const jenis = document.getElementById('filterJenisLap').value;
+
+      const allTrx = DB.getTransaksi().sort((a,b) => new Date(a.tgl) - new Date(b.tgl));
+
+      // Running saldo dulu (dari semua transaksi)
+      let saldoRun = 0;
+      const trxWithSaldo = allTrx.map(t => {
+        saldoRun += t.jenis === 'masuk' ? t.nominal : -t.nominal;
+        return { ...t, saldoSaat: saldoRun };
+      });
+
+      // Filter setelah hitung saldo
+      const filtered = trxWithSaldo.filter(t => {
+        const matchQ   = !q   || t.keterangan.toLowerCase().includes(q) || t.kategori.toLowerCase().includes(q);
+        const matchBln = !bln || t.tgl.startsWith(bln);
+        const matchJ   = !jenis || t.jenis === jenis;
+        return matchQ && matchBln && matchJ;
+      }).reverse(); // tampilkan terbaru dulu
+
+      const html = filtered.length === 0
+        ? '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--gray-400)">Tidak ada transaksi</td></tr>'
+        : filtered.map((t,i) => `
+          <tr>
+            <td data-label="No">${i+1}</td>
+            <td data-label="Tanggal">${Utils.tglIndo(t.tgl)}</td>
+            <td data-label="Keterangan">${t.keterangan}</td>
+            <td data-label="Kategori"><span class="badge badge--gray">${t.kategori}</span></td>
+            <td data-label="Jenis">
+              <span class="badge ${t.jenis==='masuk'?'badge--sukses':'badge--danger'}">
+                ${t.jenis==='masuk'?'⬆ Masuk':'⬇ Keluar'}
+              </span>
+            </td>
+            <td data-label="Nominal" class="${t.jenis==='masuk'?'text-green':'text-red'}" style="font-weight:600">
+              ${t.jenis==='masuk'?'+':'-'}${Utils.rupiah(t.nominal)}
+            </td>
+            <td data-label="Saldo" style="font-weight:600;color:var(--gray-700)">${Utils.rupiah(t.saldoSaat)}</td>
+          </tr>`).join('');
+
+      const totalMasuk  = filtered.filter(t=>t.jenis==='masuk').reduce((a,t)=>a+t.nominal,0);
+      const totalKeluar = filtered.filter(t=>t.jenis==='keluar').reduce((a,t)=>a+t.nominal,0);
+
+      document.getElementById('lapTableBody').innerHTML = html;
+      document.getElementById('lapFooter').innerHTML = `
+        <tr>
+          <td colspan="5" style="text-align:right">Total (ditampilkan)</td>
+          <td colspan="2">
+            <span class="text-green fw-600">+${Utils.rupiah(totalMasuk)}</span>
+            &nbsp;/&nbsp;
+            <span class="text-red fw-600">-${Utils.rupiah(totalKeluar)}</span>
+          </td>
+        </tr>`;
+    }
+
+    // ── Rekap iuran ────────────────────────────────────────────
+    function renderIuranLaporan() {
+      const filterBln = document.getElementById('filterBulanIuranLap').value;
+      const bulanList = DB.getBulanIuran();
+
+      // Populate filter bulan
+      const sel = document.getElementById('filterBulanIuranLap');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Semua Bulan</option>' +
+        bulanList.map(b => `<option value="${b}" ${b===cur?'selected':''}>${Utils.bulanIndo(b)}</option>`).join('');
+
+      let iuranAll = DB.getIuran();
+      if (filterBln) iuranAll = iuranAll.filter(i => i.bulan === filterBln);
+
+      const html = iuranAll.length === 0
+        ? '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--gray-400)">Tidak ada data iuran</td></tr>'
+        : iuranAll.map((i, idx) => {
+            const s = DB.getSiswaById(i.siswaId);
+            return `
+              <tr>
+                <td data-label="No">${idx+1}</td>
+                <td data-label="Nama">${s ? s.nama : '—'}</td>
+                <td data-label="NIS">${s ? s.nis : '—'}</td>
+                <td data-label="Bulan">${Utils.bulanIndo(i.bulan)}</td>
+                <td data-label="Nominal">${Utils.rupiah(i.nominal)}</td>
+                <td data-label="Status"><span class="badge ${Utils.badgeStatus(i.status)}">${i.status==='lunas'?'✓ Lunas':'⏳ Belum'}</span></td>
+                <td data-label="Tgl Bayar">${Utils.tglIndo(i.tglBayar)}</td>
+              </tr>`;
+          }).join('');
+
+      document.getElementById('iuranTableBody').innerHTML = html;
+    }
+
+    // ── Chart ──────────────────────────────────────────────────
+    function renderChart() {
+      const trx = DB.getTransaksi();
+
+      // Per bulan
+      const bulanMap = {};
+      trx.forEach(t => {
+        const bln = t.tgl.slice(0,7);
+        if (!bulanMap[bln]) bulanMap[bln] = { masuk: 0, keluar: 0 };
+        if (t.jenis === 'masuk') bulanMap[bln].masuk += t.nominal;
+        else bulanMap[bln].keluar += t.nominal;
+      });
+
+      const bulanKeys = Object.keys(bulanMap).sort();
+      const maxMasuk  = Math.max(...bulanKeys.map(b => bulanMap[b].masuk), 1);
+      const maxKeluar = Math.max(...bulanKeys.map(b => bulanMap[b].keluar), 1);
+
+      document.getElementById('chartMasuk').innerHTML = bulanKeys.length === 0
+        ? '<p class="text-muted text-sm">Tidak ada data</p>'
+        : bulanKeys.map(b => {
+            const pct = Math.round(bulanMap[b].masuk / maxMasuk * 100);
+            return `
+              <div class="chart-bar-row">
+                <span class="chart-bar-label">${Utils.bulanIndo(b).split(' ')[0]}</span>
+                <div class="chart-bar-wrap">
+                  <div class="chart-bar-fill chart-bar--green" style="width:${pct}%">
+                    <span>${Utils.rupiah(bulanMap[b].masuk)}</span>
+                  </div>
+                </div>
+              </div>`;
+          }).join('');
+
+      document.getElementById('chartKeluar').innerHTML = bulanKeys.length === 0
+        ? '<p class="text-muted text-sm">Tidak ada data</p>'
+        : bulanKeys.map(b => {
+            const pct = Math.round(bulanMap[b].keluar / maxKeluar * 100);
+            return `
+              <div class="chart-bar-row">
+                <span class="chart-bar-label">${Utils.bulanIndo(b).split(' ')[0]}</span>
+                <div class="chart-bar-wrap">
+                  <div class="chart-bar-fill chart-bar--red" style="width:${pct}%">
+                    <span>${Utils.rupiah(bulanMap[b].keluar)}</span>
+                  </div>
+                </div>
+              </div>`;
+          }).join('');
+
+      // Per kategori
+      const katMap = {};
+      trx.forEach(t => {
+        if (!katMap[t.kategori]) katMap[t.kategori] = 0;
+        katMap[t.kategori] += t.nominal;
+      });
+      const katKeys = Object.keys(katMap).sort((a,b) => katMap[b] - katMap[a]);
+      const maxKat  = Math.max(...katKeys.map(k => katMap[k]), 1);
+
+      document.getElementById('chartKategori').innerHTML = katKeys.length === 0
+        ? '<p class="text-muted text-sm">Tidak ada data</p>'
+        : katKeys.map(k => {
+            const pct = Math.round(katMap[k] / maxKat * 100);
+            return `
+              <div class="chart-bar-row">
+                <span class="chart-bar-label">${k}</span>
+                <div class="chart-bar-wrap">
+                  <div class="chart-bar-fill chart-bar--green" style="width:${pct}%">
+                    <span>${Utils.rupiah(katMap[k])}</span>
+                  </div>
+                </div>
+              </div>`;
+          }).join('');
+    }
+
+    // ── Tabs ───────────────────────────────────────────────────
+    function switchTab(id) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      const tabs = ['riwayat','iuran','chart'];
+      document.querySelectorAll('.tab-btn')[tabs.indexOf(id)].classList.add('active');
+      document.getElementById('tab-'+id).classList.add('active');
+    }
+
+    function resetFilter() {
+      document.getElementById('searchLap').value = '';
+      document.getElementById('filterBulanLap').value = '';
+      document.getElementById('filterJenisLap').value = '';
+      renderRiwayat();
+    }
+
+    // Event listeners
+    document.getElementById('searchLap').addEventListener('input', renderRiwayat);
+    document.getElementById('filterBulanLap').addEventListener('change', renderRiwayat);
+    document.getElementById('filterJenisLap').addEventListener('change', renderRiwayat);
+    document.getElementById('filterBulanIuranLap').addEventListener('change', renderIuranLaporan);
+
+    // Init
+    renderSummary();
+    renderRiwayat();
+    renderIuranLaporan();
+    renderChart();
+  </script>
+</body>
+</html>

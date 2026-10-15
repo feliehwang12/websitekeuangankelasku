@@ -22,78 +22,125 @@
 
       <!-- Body -->
       <div class="login-body">
-        <div class="login-error" id="loginError">
-          <span>⚠</span>
-          <span id="loginErrorMsg">NIS/NIPD tidak ditemukan atau tidak aktif.</span>
+
+        <!-- Alert box -->
+        <div class="login-error" id="alertBox">
+          <span id="alertIcon">⚠</span>
+          <span id="alertMsg"></span>
         </div>
 
+        <!-- ── Form Login ────────────────────────────── -->
         <form id="loginForm" autocomplete="off">
           <div class="form-group">
-            <label for="inputNis">NIS / NIPD <span class="required">*</span></label>
+            <label for="inputEmail">Email <span class="required">*</span></label>
             <div class="login-input-wrap">
-              <span class="login-input-icon">🪪</span>
-              <input type="text" id="inputNis" class="form-control"
-                placeholder="Masukkan NIS atau NIPD kamu"
-                maxlength="20" required autofocus />
+              <span class="login-input-icon">✉️</span>
+              <input type="email" id="inputEmail" class="form-control"
+                placeholder="email@kamu.com"
+                maxlength="100" required autofocus />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="inputPassword">Password <span class="required">*</span></label>
+            <div class="login-input-wrap">
+              <span class="login-input-icon">🔒</span>
+              <input type="password" id="inputPassword" class="form-control"
+                placeholder="••••••••" minlength="6" required />
+              <button type="button" class="login-input-toggle" id="togglePwd" aria-label="Tampilkan password">👁</button>
             </div>
           </div>
 
           <button type="submit" class="btn-login" id="btnLogin">
             <div class="spinner"></div>
-            <span>Masuk ke Aplikasi</span>
+            <span>Masuk</span>
           </button>
         </form>
 
-        <div class="login-hint">
-          <p>💡 Akun Demo:</p>
-          <ul class="login-hint-list">
-            <li>Bendahara: NIS <strong>9999</strong></li>
-            <li>Siswa contoh: NIS <strong>0001</strong> s/d <strong>0015</strong></li>
-          </ul>
+        <div style="text-align:center;margin-top:1.25rem;font-size:.875rem;color:var(--gray-500)">
+          Belum punya akun?
+          <a href="register.html" style="color:var(--emerald-600);font-weight:600;text-decoration:none">Daftar sekarang</a>
         </div>
+
       </div>
 
       <div class="login-footer">
-        &copy; 2025 Keuangan Kelasku &bull; Versi 1.0
+        &copy; 2025 Keuangan Kelasku &bull; Versi 2.0
       </div>
     </div>
   </div>
 
+  <!-- Supabase JS CDN (v2) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Config publik (URL + anon key) -->
+  <script src="js/config.js"></script>
+  <!-- Data layer (localStorage fallback) -->
   <script src="js/data.js"></script>
   <script src="js/utils.js"></script>
-  <script>
-    const form   = document.getElementById('loginForm');
-    const errBox = document.getElementById('loginError');
-    const errMsg = document.getElementById('loginErrorMsg');
-    const btn    = document.getElementById('btnLogin');
+  <!-- Auth module -->
+  <script src="js/auth.js"></script>
 
-    // Kalau sudah login, langsung ke dashboard
-    if (DB.getSesi() && DB.getSesi().siswaId) {
-      window.location.href = 'pages/dashboard.html';
+  <script>
+    // Cek jika sudah ada sesi aktif → langsung ke dashboard
+    (async () => {
+      const session = await Auth.getSession();
+      if (session) {
+        window.location.href = 'pages/dashboard.html';
+      }
+    })();
+
+    // Toggle show/hide password
+    document.getElementById('togglePwd').addEventListener('click', function () {
+      const pwd = document.getElementById('inputPassword');
+      const isText = pwd.type === 'text';
+      pwd.type = isText ? 'password' : 'text';
+      this.textContent = isText ? '👁' : '🙈';
+    });
+
+    function showAlert(msg, tipe = 'error') {
+      const box  = document.getElementById('alertBox');
+      const icon = document.getElementById('alertIcon');
+      const txt  = document.getElementById('alertMsg');
+      icon.textContent = tipe === 'error' ? '⚠' : '✓';
+      txt.textContent  = msg;
+      box.style.background  = tipe === 'error' ? '#fee2e2' : '#d1fae5';
+      box.style.borderColor = tipe === 'error' ? '#fca5a5' : '#6ee7b7';
+      box.style.color       = tipe === 'error' ? '#dc2626' : '#065f46';
+      box.classList.add('show');
+    }
+    function hideAlert() {
+      document.getElementById('alertBox').classList.remove('show');
     }
 
-    form.addEventListener('submit', function(e) {
+    // ── Submit Login ──────────────────────────────────────────
+    document.getElementById('loginForm').addEventListener('submit', async function (e) {
       e.preventDefault();
-      errBox.classList.remove('show');
+      hideAlert();
+
+      const email    = document.getElementById('inputEmail').value.trim();
+      const password = document.getElementById('inputPassword').value;
+      const btn      = document.getElementById('btnLogin');
+
       btn.classList.add('loading');
       btn.disabled = true;
 
-      const nis = document.getElementById('inputNis').value.trim();
+      const { data, error } = await Auth.signIn({ email, password });
 
-      // Simulasi delay kecil agar terasa natural
-      setTimeout(() => {
-        const siswa = DB.login(nis);
-        btn.classList.remove('loading');
-        btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.disabled = false;
 
-        if (siswa) {
-          window.location.href = 'pages/dashboard.html';
-        } else {
-          errMsg.textContent = `NIS "${nis}" tidak ditemukan atau akun tidak aktif.`;
-          errBox.classList.add('show');
-          document.getElementById('inputNis').focus();
+      if (error) {
+        let pesan = 'Login gagal. Periksa email dan password Anda.';
+        if (error.message?.includes('Invalid login')) pesan = 'Email atau password salah.';
+        if (error.message?.includes('Email not confirmed')) pesan = 'Email belum dikonfirmasi. Periksa inbox Anda.';
+        if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+          pesan = 'Gagal terhubung ke server. Periksa koneksi internet Anda.';
         }
-      }, 600);
+        showAlert(pesan);
+        return;
+      }
+
+      window.location.href = 'pages/dashboard.html';
     });
   </script>
 </body>

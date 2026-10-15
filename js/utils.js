@@ -82,8 +82,14 @@ const Utils = {
     if (m) { m.classList.remove('active'); document.body.style.overflow = ''; }
   },
 
-  // Guard: redirect jika belum login
-  requireLogin() {
+  // Guard: redirect jika belum login (async — cek sesi Supabase)
+  async requireLogin() {
+    // Cek sesi Supabase terlebih dahulu
+    if (typeof Auth !== 'undefined') {
+      const user = await Auth.requireAuth();
+      return !!user;
+    }
+    // Fallback localStorage (mode offline/demo)
     const sesi = DB.getSesi();
     if (!sesi || !sesi.siswaId) {
       window.location.href = '../index.html';

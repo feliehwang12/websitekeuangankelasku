@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daftar — Keuangan Kelasku</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/login.css" />
+  <style>
+    .register-success {
+      display: none;
+      text-align: center;
+      padding: 1.5rem 0;
+    }
+    .register-success .success-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .register-success h3 { color: var(--emerald-700); margin-bottom: .5rem; }
+    .register-success p  { color: var(--gray-500); font-size: .875rem; margin-bottom: 1.25rem; }
+  </style>
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+
+      <!-- Header -->
+      <div class="login-header">
+        <div class="login-logo">💰</div>
+        <h1>Keuangan Kelasku</h1>
+        <p>Buat akun baru untuk bergabung</p>
+      </div>
+
+      <!-- Body -->
+      <div class="login-body">
+
+        <!-- Alert box -->
+        <div class="login-error" id="alertBox">
+          <span id="alertIcon">⚠</span>
+          <span id="alertMsg"></span>
+        </div>
+
+        <!-- ── Form Register ───────────────────────── -->
+        <form id="registerForm" autocomplete="off" id="formArea">
+
+          <div class="form-group">
+            <label for="inputNama">Nama Lengkap <span class="required">*</span></label>
+            <div class="login-input-wrap">
+              <span class="login-input-icon">👤</span>
+              <input type="text" id="inputNama" class="form-control"
+                placeholder="Nama lengkap kamu"
+                maxlength="100" required autofocus />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="inputEmailReg">Email <span class="required">*</span></label>
+            <div class="login-input-wrap">
+              <span class="login-input-icon">✉️</span>
+              <input type="email" id="inputEmailReg" class="form-control"
+                placeholder="email@kamu.com" maxlength="100" required />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="inputPwdReg">Password <span class="required">*</span></label>
+            <div class="login-input-wrap">
+              <span class="login-input-icon">🔒</span>
+              <input type="password" id="inputPwdReg" class="form-control"
+                placeholder="Min. 6 karakter" minlength="6" required />
+              <button type="button" class="login-input-toggle" id="togglePwd">👁</button>
+            </div>
+            <p class="form-hint">Minimal 6 karakter</p>
+          </div>
+
+          <div class="form-group">
+            <label for="inputPwdKonfirm">Konfirmasi Password <span class="required">*</span></label>
+            <div class="login-input-wrap">
+              <span class="login-input-icon">🔒</span>
+              <input type="password" id="inputPwdKonfirm" class="form-control"
+                placeholder="Ulangi password" minlength="6" required />
+            </div>
+          </div>
+
+          <button type="submit" class="btn-login" id="btnDaftar">
+            <div class="spinner"></div>
+            <span>Buat Akun</span>
+          </button>
+        </form>
+
+        <!-- Sukses state -->
+        <div class="register-success" id="registerSuccess">
+          <div class="success-icon">✅</div>
+          <h3>Akun berhasil dibuat!</h3>
+          <p>Silakan masuk menggunakan email dan password yang sudah kamu daftarkan.</p>
+          <a href="index.html" class="btn-login" style="display:flex;text-decoration:none;justify-content:center">
+            Ke Halaman Login
+          </a>
+        </div>
+
+        <div style="text-align:center;margin-top:1.25rem;font-size:.875rem;color:var(--gray-500)" id="loginLink">
+          Sudah punya akun?
+          <a href="index.html" style="color:var(--emerald-600);font-weight:600;text-decoration:none">Masuk di sini</a>
+        </div>
+
+      </div>
+
+      <div class="login-footer">
+        &copy; 2025 Keuangan Kelasku &bull; Versi 2.0
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+
+  <script>
+    // Toggle show/hide password
+    document.getElementById('togglePwd').addEventListener('click', function () {
+      const pwd = document.getElementById('inputPwdReg');
+      const isText = pwd.type === 'text';
+      pwd.type = isText ? 'password' : 'text';
+      this.textContent = isText ? '👁' : '🙈';
+    });
+
+    function showAlert(msg, tipe = 'error') {
+      const box  = document.getElementById('alertBox');
+      const icon = document.getElementById('alertIcon');
+      const txt  = document.getElementById('alertMsg');
+      icon.textContent = tipe === 'error' ? '⚠' : '✓';
+      txt.textContent  = msg;
+      box.style.background  = tipe === 'error' ? '#fee2e2' : '#d1fae5';
+      box.style.borderColor = tipe === 'error' ? '#fca5a5' : '#6ee7b7';
+      box.style.color       = tipe === 'error' ? '#dc2626' : '#065f46';
+      box.classList.add('show');
+    }
+    function hideAlert() {
+      document.getElementById('alertBox').classList.remove('show');
+    }
+
+    // ── Submit Register ───────────────────────────────────────
+    document.getElementById('registerForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      hideAlert();
+
+      const nama     = document.getElementById('inputNama').value.trim();
+      const email    = document.getElementById('inputEmailReg').value.trim();
+      const password = document.getElementById('inputPwdReg').value;
+      const konfirm  = document.getElementById('inputPwdKonfirm').value;
+      const btn      = document.getElementById('btnDaftar');
+
+      // Validasi client-side
+      if (!nama || nama.length < 2) {
+        showAlert('Nama lengkap minimal 2 karakter.'); return;
+      }
+      if (password !== konfirm) {
+        showAlert('Konfirmasi password tidak cocok.'); return;
+      }
+      if (password.length < 6) {
+        showAlert('Password minimal 6 karakter.'); return;
+      }
+
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      const { data, error } = await Auth.signUp({ nama, email, password });
+
+      btn.classList.remove('loading');
+      btn.disabled = false;
+
+      if (error) {
+        let pesan = 'Pendaftaran gagal. Coba lagi.';
+        if (error.message?.includes('already registered') || error.message?.includes('User already registered')) {
+          pesan = 'Email ini sudah terdaftar. Silakan login.';
+        }
+        if (error.message?.includes('Password should be')) {
+          pesan = 'Password terlalu lemah. Gunakan minimal 6 karakter.';
+        }
+        if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+          pesan = 'Gagal terhubung ke server. Periksa koneksi internet Anda.';
+        }
+        showAlert(pesan);
+        return;
+      }
+
+      // Tampilkan sukses, sembunyikan form
+      document.getElementById('registerForm').style.display = 'none';
+      document.getElementById('loginLink').style.display = 'none';
+      document.getElementById('registerSuccess').style.display = 'block';
+    });
+  </script>
+</body>
+</html>

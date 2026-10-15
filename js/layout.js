@@ -13,8 +13,19 @@ const Layout = {
     { icon: '📋', label: 'Laporan',            href: 'laporan.html',    section: 'Keuangan' },
   ],
 
-  init(pageId) {
-    if (!Utils.requireLogin()) return;
+  async init(pageId) {
+    // Cek auth Supabase — tunggu sampai sesi terkonfirmasi
+    if (typeof Auth !== 'undefined') {
+      const user = await Auth.requireAuth();
+      if (!user) return; // requireAuth sudah redirect ke index.html
+    } else {
+      // Fallback: cek sesi localStorage
+      const sesi = DB.getSesi();
+      if (!sesi || !sesi.siswaId) {
+        window.location.href = '../index.html';
+        return;
+      }
+    }
     const sesi = DB.getSesi();
     this.render(sesi, pageId);
     this.bindEvents();
@@ -94,10 +105,14 @@ const Layout = {
   },
 
   bindEvents() {
-    // Logout
-    document.getElementById('btnLogout')?.addEventListener('click', () => {
-      DB.logout();
-      window.location.href = '../index.html';
+    // Logout — gunakan Auth.signOut() jika tersedia
+    document.getElementById('btnLogout')?.addEventListener('click', async () => {
+      if (typeof Auth !== 'undefined') {
+        await Auth.signOut();
+      } else {
+        DB.logout();
+        window.location.href = '../index.html';
+      }
     });
 
     // Mobile menu toggle

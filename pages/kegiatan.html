@@ -353,13 +353,17 @@
       }).join('');
     }
 
-    function toggleKgBayar(kgId, siswaId, status) {
+    async function toggleKgBayar(kgId, siswaId, status) {
       if (!Utils.requireBendahara()) return;
       const newStatus = status === 'lunas' ? 'belum' : 'lunas';
-      DB.updateKgBayar(kgId, siswaId, newStatus);
-      renderDetail();
-      renderKegiatan();
-      Utils.toast(newStatus === 'lunas' ? 'Ditandai sudah bayar ✓' : 'Ditandai belum bayar');
+      try {
+        await DB.updateKgBayar(kgId, siswaId, newStatus);
+        renderDetail();
+        renderKegiatan();
+        Utils.toast(newStatus === 'lunas' ? 'Ditandai sudah bayar ✓' : 'Ditandai belum bayar');
+      } catch (e) {
+        Utils.toast('Gagal memperbarui: ' + (e.message || 'error'), 'error');
+      }
     }
 
     // ── CRUD Kegiatan ──────────────────────────────────────────
@@ -395,12 +399,16 @@
       const kg = DB.getKegiatanById(id);
       const ok = await Utils.konfirmasi('Hapus Kegiatan', `Hapus kegiatan <strong>${kg.nama}</strong> beserta semua data pembayarannya?`);
       if (!ok) return;
-      DB.hapusKegiatan(id);
-      Utils.toast('Kegiatan berhasil dihapus.');
-      renderKegiatan();
+      try {
+        await DB.hapusKegiatan(id);
+        Utils.toast('Kegiatan berhasil dihapus.');
+        renderKegiatan();
+      } catch (e) {
+        Utils.toast('Gagal menghapus: ' + (e.message || 'error'), 'error');
+      }
     }
 
-    document.getElementById('btnSimpanKegiatan').onclick = () => {
+    document.getElementById('btnSimpanKegiatan').onclick = async () => {
       if (!Utils.requireBendahara()) return;
       const data = {
         nama:      document.getElementById('kgNama').value.trim(),
@@ -410,15 +418,23 @@
       };
       if (!data.nama || !data.nominal || !data.tgl) { Utils.toast('Lengkapi data kegiatan.', 'error'); return; }
 
-      if (editKgId) {
-        DB.updateKegiatan(editKgId, data);
-        Utils.toast('Kegiatan diperbarui.');
-      } else {
-        DB.tambahKegiatan(data);
-        Utils.toast('Kegiatan baru ditambahkan.');
+      const btn = document.getElementById('btnSimpanKegiatan');
+      btn.disabled = true;
+      try {
+        if (editKgId) {
+          await DB.updateKegiatan(editKgId, data);
+          Utils.toast('Kegiatan diperbarui.');
+        } else {
+          await DB.tambahKegiatan(data);
+          Utils.toast('Kegiatan baru ditambahkan.');
+        }
+        Utils.tutupModal('modalKegiatan');
+        renderKegiatan();
+      } catch (e) {
+        Utils.toast('Gagal menyimpan: ' + (e.message || 'error'), 'error');
+      } finally {
+        btn.disabled = false;
       }
-      Utils.tutupModal('modalKegiatan');
-      renderKegiatan();
     };
 
     // Filter detail realtime

@@ -94,6 +94,21 @@
             </div>
           </div>
 
+          <!-- Pemilihan Kelas -->
+          <div class="form-group">
+            <label for="inputKelas">Kelas <span class="required">*</span></label>
+            <div class="login-input-wrap">
+              <span class="login-input-icon">🏫</span>
+              <select id="inputKelas" class="form-control" style="padding-left:2.75rem;height:48px" required>
+                <option value="LPS">Kelas LPS</option>
+                <option value="Akuntansi Satu">Kelas Akuntansi Satu</option>
+                <option value="Akuntansi Dua">Kelas Akuntansi Dua</option>
+                <option value="Askep">Kelas Askep</option>
+              </select>
+            </div>
+            <p class="form-hint">Pilih kelas kamu. Semua anggota kelas yang sama berbagi pencatatan kas yang sama.</p>
+          </div>
+
           <!-- Pemilihan Peran -->
           <div class="form-group">
             <label>Daftar sebagai <span class="required">*</span></label>
@@ -235,12 +250,16 @@
       const password = document.getElementById('inputPwdReg').value;
       const konfirm  = document.getElementById('inputPwdKonfirm').value;
       const role     = document.querySelector('input[name="role"]:checked').value;
+      const kelas    = document.getElementById('inputKelas').value;
       const kodeBdh  = document.getElementById('inputKodeBendahara').value.trim();
       const btn      = document.getElementById('btnDaftar');
 
       // Validasi client-side
       if (!nama || nama.length < 2) {
         showAlert('Nama lengkap minimal 2 karakter.'); return;
+      }
+      if (!['LPS','Akuntansi Satu','Akuntansi Dua','Askep'].includes(kelas)) {
+        showAlert('Pilih kelas yang valid.'); return;
       }
       if (!['siswa','bendahara'].includes(role)) {
         showAlert('Pilih peran yang valid.'); return;
@@ -258,7 +277,7 @@
       btn.classList.add('loading');
       btn.disabled = true;
 
-      const { data, error, roleFinal } = await Auth.signUp({ nama, email, password, role, kodeBendahara: kodeBdh });
+      const { data, error, roleFinal } = await Auth.signUp({ nama, email, password, role, kodeBendahara: kodeBdh, kelas });
 
       btn.classList.remove('loading');
       btn.disabled = false;

@@ -79,7 +79,7 @@ const Layout = {
         <div class="sidebar-avatar">${avatarText}</div>
         <div class="sidebar-user-info">
           <strong>${sesi.nama}</strong>
-          <span>${sesi.role === 'bendahara' ? '💼 Bendahara' : '🎓 Siswa · NIS ' + sesi.nis}</span>
+          <span>${sesi.role === 'bendahara' ? '💼 Bendahara' : '🎓 Siswa'} · ${sesi.kelas || '-'}</span>
         </div>
       </div>
       <nav class="sidebar-nav">${navHTML}</nav>
@@ -100,6 +100,7 @@ const Layout = {
       </div>
       <div class="topbar-right">
         <span class="topbar-date d-none d-sm-block">${tanggal}</span>
+        <span class="topbar-role-badge" style="background:var(--emerald-100);color:var(--emerald-800)">🏫 ${sesi.kelas || '-'}</span>
         ${roleBadge}
       </div>
     `;

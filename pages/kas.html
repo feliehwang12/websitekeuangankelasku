@@ -352,13 +352,17 @@
       }).join('');
     }
 
-    function toggleIuran(id, status) {
+    async function toggleIuran(id, status) {
       if (!Utils.requireBendahara()) return;
       const newStatus = status === 'lunas' ? 'belum' : 'lunas';
-      DB.updateIuran(id, { status: newStatus, tglBayar: newStatus === 'lunas' ? new Date().toISOString().split('T')[0] : null });
-      renderIuran();
-      renderSummary();
-      Utils.toast(newStatus === 'lunas' ? 'Ditandai lunas ✓' : 'Ditandai belum bayar');
+      try {
+        await DB.updateIuran(id, { status: newStatus, tglBayar: newStatus === 'lunas' ? new Date().toISOString().split('T')[0] : null });
+        renderIuran();
+        renderSummary();
+        Utils.toast(newStatus === 'lunas' ? 'Ditandai lunas ✓' : 'Ditandai belum bayar');
+      } catch (e) {
+        Utils.toast('Gagal memperbarui: ' + (e.message || 'error'), 'error');
+      }
     }
 
     // ── Tabs ───────────────────────────────────────────────────
@@ -401,12 +405,16 @@
       if (!Utils.requireBendahara()) return;
       const ok = await Utils.konfirmasi('Hapus Transaksi', 'Hapus transaksi ini?');
       if (!ok) return;
-      DB.hapusTransaksi(id);
-      Utils.toast('Transaksi berhasil dihapus.');
-      renderTrx();
+      try {
+        await DB.hapusTransaksi(id);
+        Utils.toast('Transaksi berhasil dihapus.');
+        renderTrx();
+      } catch (e) {
+        Utils.toast('Gagal menghapus: ' + (e.message || 'error'), 'error');
+      }
     }
 
-    document.getElementById('btnSimpanTrx').onclick = () => {
+    document.getElementById('btnSimpanTrx').onclick = async () => {
       if (!Utils.requireBendahara()) return;
       const data = {
         tgl:         document.getElementById('trxTgl').value,
@@ -418,15 +426,23 @@
       if (!data.tgl || !data.keterangan || !data.kategori || !data.nominal) {
         Utils.toast('Lengkapi semua field.', 'error'); return;
       }
-      if (editTrxId) {
-        DB.updateTransaksi(editTrxId, data);
-        Utils.toast('Transaksi diperbarui.');
-      } else {
-        DB.tambahTransaksi(data);
-        Utils.toast('Transaksi berhasil disimpan.');
+      const btn = document.getElementById('btnSimpanTrx');
+      btn.disabled = true;
+      try {
+        if (editTrxId) {
+          await DB.updateTransaksi(editTrxId, data);
+          Utils.toast('Transaksi diperbarui.');
+        } else {
+          await DB.tambahTransaksi(data);
+          Utils.toast('Transaksi berhasil disimpan.');
+        }
+        Utils.tutupModal('modalTrx');
+        renderTrx();
+      } catch (e) {
+        Utils.toast('Gagal menyimpan: ' + (e.message || 'error'), 'error');
+      } finally {
+        btn.disabled = false;
       }
-      Utils.tutupModal('modalTrx');
-      renderTrx();
     };
 
     // ── Tambah Bulan Iuran ─────────────────────────────────────
@@ -434,15 +450,23 @@
       document.getElementById('bulanIuranField').value = new Date().toISOString().slice(0,7);
       Utils.bukaModal('modalBulanIuran');
     };
-    document.getElementById('btnSimpanBulanIuran').onclick = () => {
+    document.getElementById('btnSimpanBulanIuran').onclick = async () => {
       if (!Utils.requireBendahara()) return;
       const bln     = document.getElementById('bulanIuranField').value;
       const nominal = parseFloat(document.getElementById('nominalIuranField').value) || 10000;
       if (!bln) { Utils.toast('Pilih bulan.', 'error'); return; }
-      DB.tambahBulanIuran(bln, nominal);
-      Utils.toast('Bulan iuran berhasil ditambahkan.');
-      Utils.tutupModal('modalBulanIuran');
-      renderIuran();
+      const btn = document.getElementById('btnSimpanBulanIuran');
+      btn.disabled = true;
+      try {
+        await DB.tambahBulanIuran(bln, nominal);
+        Utils.toast('Bulan iuran berhasil ditambahkan.');
+        Utils.tutupModal('modalBulanIuran');
+        renderIuran();
+      } catch (e) {
+        Utils.toast('Gagal menambah bulan: ' + (e.message || 'error'), 'error');
+      } finally {
+        btn.disabled = false;
+      }
     };
 
     // ── Init ───────────────────────────────────────────────────

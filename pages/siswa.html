@@ -134,8 +134,8 @@
               <input type="text" class="form-control" id="siswaFieldNis" placeholder="contoh: 0016" required />
             </div>
             <div class="form-group">
-              <label>Peran <span class="required">*</span></label>
-              <select class="form-control" id="siswaFieldRole">
+              <label>Peran</label>
+              <select class="form-control" id="siswaFieldRole" disabled title="Peran tidak dapat diubah dari sini">
                 <option value="siswa">Siswa</option>
                 <option value="bendahara">Bendahara</option>
               </select>
@@ -174,10 +174,8 @@
     // Tunggu auth selesai sebelum render & cek role
     Layout.init('siswa').then((ok) => {
       if (!ok) return;
-      // Sembunyikan tombol aksi jika bukan bendahara
-      if (!DB.isBendahara()) {
-        document.getElementById('btnTambahSiswa').classList.add('d-none');
-      }
+      // Siswa baru bergabung lewat pendaftaran akun → tombol tambah manual disembunyikan
+      document.getElementById('btnTambahSiswa').classList.add('d-none');
       render();
     });
 
@@ -289,36 +287,48 @@
       Utils.bukaModal('modalSiswa');
     }
 
-    // Hapus
+    // Hapus (nonaktifkan — di mode multi-kelas, siswa terikat akun)
     async function hapusSiswa(id) {
       if (!Utils.requireBendahara()) return;
       const s   = DB.getSiswaById(id);
-      const ok  = await Utils.konfirmasi('Hapus Siswa', `Hapus data <strong>${s.nama}</strong>?`);
+      const ok  = await Utils.konfirmasi('Nonaktifkan Siswa', `Nonaktifkan <strong>${s.nama}</strong>? Data tetap tersimpan, siswa hanya ditandai non-aktif.`);
       if (!ok) return;
-      DB.hapusSiswa(id);
-      Utils.toast('Data siswa berhasil dihapus.');
-      render();
+      try {
+        await DB.updateSiswa(id, { aktif: false });
+        Utils.toast('Siswa dinonaktifkan.');
+        render();
+      } catch (e) {
+        Utils.toast('Gagal: ' + (e.message || 'error'), 'error');
+      }
     }
 
-    // Simpan
-    document.getElementById('btnSimpanSiswa').onclick = () => {
+    // Simpan (hanya edit — penambahan siswa lewat pendaftaran akun)
+    document.getElementById('btnSimpanSiswa').onclick = async () => {
       if (!Utils.requireBendahara()) return;
       const nis   = document.getElementById('siswaFieldNis').value.trim();
       const nama  = document.getElementById('siswaFieldNama').value.trim();
-      const role  = document.getElementById('siswaFieldRole').value;
       const aktif = document.getElementById('siswaFieldAktif').value === '1';
 
-      if (!nis || !nama) { Utils.toast('NIS dan nama wajib diisi.', 'error'); return; }
+      if (!nama) { Utils.toast('Nama wajib diisi.', 'error'); return; }
 
-      if (editId) {
-        DB.updateSiswa(editId, { nis, nama, role, aktif });
-        Utils.toast('Data siswa berhasil diperbarui.');
-      } else {
-        DB.tambahSiswa({ nis, nama, role, aktif });
-        Utils.toast('Siswa baru berhasil ditambahkan.');
+      if (!editId) {
+        Utils.toast('Siswa baru bergabung dengan mendaftar akun & memilih kelas yang sama.', 'info');
+        Utils.tutupModal('modalSiswa');
+        return;
       }
-      Utils.tutupModal('modalSiswa');
-      render();
+
+      const btn = document.getElementById('btnSimpanSiswa');
+      btn.disabled = true;
+      try {
+        await DB.updateSiswa(editId, { nis, nama, aktif });
+        Utils.toast('Data siswa berhasil diperbarui.');
+        Utils.tutupModal('modalSiswa');
+        render();
+      } catch (e) {
+        Utils.toast('Gagal menyimpan: ' + (e.message || 'error'), 'error');
+      } finally {
+        btn.disabled = false;
+      }
     };
   </script>
 </body>

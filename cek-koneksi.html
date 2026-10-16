@@ -32,6 +32,25 @@
       </div>
     </div>
     <div id="hasil"></div>
+
+    <!-- Alat diagnosa akun -->
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header"><h3>🧪 Cek Role & Kelas Akun</h3></div>
+      <div class="card-body">
+        <p class="text-sm text-muted mb-4">Masukkan email & password akun untuk melihat role & kelas yang TERSIMPAN di database.</p>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="diagEmail" class="form-control" placeholder="email@kamu.com" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="diagPwd" class="form-control" placeholder="••••••••" />
+        </div>
+        <button class="btn btn-primary w-full" id="btnDiag">Cek Akun Ini</button>
+        <div id="diagHasil" style="margin-top:1rem"></div>
+      </div>
+    </div>
+
     <div style="text-align:center;margin-top:1.5rem">
       <a href="index.html" class="btn btn-primary">← Kembali ke Login</a>
     </div>
@@ -92,6 +111,52 @@
 
       tambah('🎉', 'Diagnostik selesai', 'Jika semua ✅, integrasi backend Anda SUKSES. Silakan coba daftar & login.', 'ok');
     })();
+
+    // ── Alat diagnosa akun ──────────────────────────────────────
+    document.getElementById('btnDiag').addEventListener('click', async () => {
+      const email = document.getElementById('diagEmail').value.trim();
+      const pwd   = document.getElementById('diagPwd').value;
+      const box   = document.getElementById('diagHasil');
+      box.innerHTML = '<p class="text-sm text-muted">Memeriksa...</p>';
+
+      const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      // Login
+      const { data: authData, error: authErr } = await client.auth.signInWithPassword({
+        email: email.toLowerCase(), password: pwd,
+      });
+      if (authErr) {
+        box.innerHTML = `<div class="diag-item"><span class="diag-icon status-fail">❌</span>
+          <div class="diag-info"><strong class="status-fail">Login gagal</strong><span>${authErr.message}</span></div></div>`;
+        return;
+      }
+
+      // Ambil profil
+      const { data: profil, error: pErr } = await client
+        .from('profiles').select('nama, role, kelas, email').eq('id', authData.user.id).single();
+
+      if (pErr || !profil) {
+        box.innerHTML = `<div class="diag-item"><span class="diag-icon status-fail">❌</span>
+          <div class="diag-info"><strong class="status-fail">Profil tidak ditemukan</strong>
+          <span>${pErr?.message || 'Baris profil belum dibuat. Trigger mungkin belum jalan — pastikan schema.sql sudah di-run ulang.'}</span></div></div>`;
+        await client.auth.signOut();
+        return;
+      }
+
+      const roleWarna = profil.role === 'bendahara' ? 'status-ok' : 'status-wait';
+      box.innerHTML = `
+        <div class="diag-item"><span class="diag-icon ${roleWarna}">${profil.role === 'bendahara' ? '💼' : '🎓'}</span>
+          <div class="diag-info">
+            <strong class="${roleWarna}">Role tersimpan: ${profil.role.toUpperCase()}</strong>
+            <span>Nama: ${profil.nama}<br>Kelas: ${profil.kelas}<br>Email: ${profil.email}</span>
+          </div>
+        </div>
+        ${profil.role !== 'bendahara' ? `<div class="diag-item"><span class="diag-icon status-wait">💡</span>
+          <div class="diag-info"><strong>Akun ini terdaftar sebagai SISWA</strong>
+          <span>Artinya kode bendahara saat daftar tidak cocok dengan kode di schema.sql (saat ini: <code>b3nd4h4r4</code>), ATAU schema.sql versi terbaru belum di-run. Daftar ulang dengan email baru + kode yang tepat, atau ubah role via SQL Editor (lihat instruksi di chat).</span></div></div>` : ''}
+      `;
+      await client.auth.signOut();
+    });
   </script>
 </body>
 </html>

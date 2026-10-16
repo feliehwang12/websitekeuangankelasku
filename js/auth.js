@@ -27,21 +27,25 @@ const Auth = (() => {
   // role: 'siswa' | 'bendahara'
   // kodeBendahara: kode rahasia (hanya relevan jika role = 'bendahara').
   // Penentuan role FINAL dilakukan oleh trigger database, bukan di sini.
-  async function signUp({ nama, email, password, role, kodeBendahara }) {
+  // kelas: 'LPS' | 'Akuntansi Satu' | 'Akuntansi Dua' | 'Askep'
+  async function signUp({ nama, email, password, role, kodeBendahara, kelas }) {
     const client = getClient();
     if (!client) return { error: { message: 'Koneksi Supabase gagal.' } };
 
     const peran = (role === 'bendahara') ? 'bendahara' : 'siswa';
+    const KELAS_VALID = ['LPS','Akuntansi Satu','Akuntansi Dua','Askep'];
+    const kls = KELAS_VALID.includes(kelas) ? kelas : 'LPS';
 
     const { data, error } = await client.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
       options: {
         // Metadata ini dibaca oleh trigger handle_new_user di database.
-        // Trigger yang memvalidasi kode & menentukan role final.
+        // Trigger yang memvalidasi kode & menentukan role + kelas final.
         data: {
           nama: nama.trim(),
           role: peran,
+          kelas: kls,
           kode_bendahara: (peran === 'bendahara') ? (kodeBendahara || '') : '',
         }
       }
@@ -49,21 +53,45 @@ const Auth = (() => {
 
     if (error) return { error };
 
-    // Cek role final yang ditentukan trigger DB (untuk info ke user).
+    // Jika user memilih bendahara, klaim role via RPC (andal, tidak
+    // bergantung timing trigger). Hanya berhasil jika kode cocok.
     let roleFinal = 'siswa';
+    if (peran === 'bendahara' && data?.session) {
+      try {
+        const { data: hasil } = await client.rpc('claim_bendahara', { kode: kodeBendahara || '' });
+        if (hasil === 'ok') roleFinal = 'bendahara';
+      } catch (_) { /* biarkan siswa */ }
+    }
+
+    // Verifikasi role final dari DB (jika sesi tersedia)
     try {
       if (data?.user) {
         const { data: profil } = await client
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
+          .from('profiles').select('role').eq('id', data.user.id).single();
         if (profil?.role) roleFinal = profil.role;
       }
-    } catch (_) { /* abaikan — default siswa */ }
+    } catch (_) { /* abaikan */ }
 
-    // Tidak auto-login — user tetap diarahkan ke halaman login.
+    // Simpan kode sementara agar bisa diklaim saat login pertama
+    // (berguna jika "Confirm email" aktif → session null saat signUp).
+    if (peran === 'bendahara' && kodeBendahara) {
+      try { sessionStorage.setItem('kk_pending_kode', kodeBendahara); } catch (_) {}
+    }
+
     return { data, error: null, roleFinal };
+  }
+
+  // ── Klaim role bendahara via RPC ─────────────────────────────
+  async function claimBendahara(kode) {
+    const client = getClient();
+    if (!client) return 'no_client';
+    try {
+      const { data, error } = await client.rpc('claim_bendahara', { kode: kode || '' });
+      if (error) return 'error';
+      return data; // 'ok' | 'wrong_code' | 'not_logged_in'
+    } catch (_) {
+      return 'error';
+    }
   }
 
   // ── Sign In ──────────────────────────────────────────────────
@@ -77,6 +105,16 @@ const Auth = (() => {
     });
 
     if (error) return { error };
+
+    // Jika ada kode bendahara pending (dari signup saat session belum ada),
+    // klaim sekarang setelah login berhasil.
+    try {
+      const pending = sessionStorage.getItem('kk_pending_kode');
+      if (pending) {
+        await client.rpc('claim_bendahara', { kode: pending });
+        sessionStorage.removeItem('kk_pending_kode');
+      }
+    } catch (_) {}
 
     // Setelah login berhasil, sinkronisasi sesi lokal
     await _syncSesiLokal(data.user);
@@ -125,12 +163,16 @@ const Auth = (() => {
       window.location.href = _isInPagesDir() ? '../index.html' : 'index.html';
       return null;
     }
-    // Sinkron sesi lokal agar DB.getSesi() tetap berfungsi
+    // Sinkron sesi lokal agar DB.getSesi() berfungsi
     await _syncSesiLokal(session.user);
+    // Muat semua data kelas aktif ke cache DB (agar getXxx() sinkron)
+    if (typeof DB !== 'undefined' && DB.loadAll) {
+      await DB.loadAll();
+    }
     return session.user;
   }
 
-  // ── Sinkron sesi Supabase → localStorage (untuk kompatibilitas DB lama) ──
+  // ── Sinkron sesi Supabase → localStorage ───────────────────
   async function _syncSesiLokal(user) {
     if (!user) return;
     const client = getClient();
@@ -138,20 +180,22 @@ const Auth = (() => {
     // Ambil profil dari tabel profiles
     const { data: profil } = await client
       .from('profiles')
-      .select('nama, role')
+      .select('nama, role, kelas')
       .eq('id', user.id)
       .single();
 
-    const nama = profil?.nama || user.user_metadata?.nama || user.email;
-    const role = profil?.role || 'siswa';
+    const nama  = profil?.nama  || user.user_metadata?.nama  || user.email;
+    const role  = profil?.role  || 'siswa';
+    const kelas = profil?.kelas || user.user_metadata?.kelas || 'LPS';
 
-    // Simpan ke localStorage agar kode lama (DB.getSesi()) tetap bekerja
+    // Simpan ke localStorage agar DB.getSesi() berfungsi
     DB.set(DB.KEYS.SESI, {
       siswaId:  user.id,
       userId:   user.id,
       email:    user.email,
       nama,
       role,
+      kelas,
       loginAt:  new Date().toISOString(),
     });
   }
@@ -161,5 +205,5 @@ const Auth = (() => {
     return window.location.pathname.includes('/pages/');
   }
 
-  return { signUp, signIn, signOut, getSession, getUser, onAuthChange, requireAuth, getClient };
+  return { signUp, signIn, signOut, getSession, getUser, onAuthChange, requireAuth, getClient, claimBendahara };
 })();

@@ -210,13 +210,15 @@
   <script src="../js/auth.js"></script>
   <script src="../js/layout.js"></script>
   <script>
-    Layout.init('kegiatan');
-
-    if (!DB.isBendahara()) {
-      document.getElementById('btnTambahKegiatan').classList.add('d-none');
-    }
-
     let activeKgId = null;
+
+    Layout.init('kegiatan').then((ok) => {
+      if (!ok) return;
+      if (!DB.isBendahara()) {
+        document.getElementById('btnTambahKegiatan').classList.add('d-none');
+      }
+      renderKegiatan();
+    });
 
     // ── Render daftar kegiatan ─────────────────────────────────
     function renderKegiatan() {
@@ -427,8 +429,6 @@
     document.getElementById('detailOverlay').addEventListener('click', e => {
       if (e.target === document.getElementById('detailOverlay')) tutupDetail();
     });
-
-    renderKegiatan();
   </script>
 </body>
 </html>

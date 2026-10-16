@@ -181,8 +181,8 @@
         offset += pct;
       });
 
-      const nomColor = centerNom && centerNom.startsWith('+') ? '#059669'
-                     : centerNom && centerNom.startsWith('-') ? '#ef4444' : '#1f2937';
+      const nomColor = centerNom && centerNom.startsWith('+') ? '#2563eb'
+                     : centerNom && centerNom.startsWith('-') ? '#ef4444' : '#1e293b';
 
       return `
         <div class="donat-svg-wrap">
@@ -214,8 +214,10 @@
       </ul>`;
     }
 
-    Layout.init('dashboard');
-    renderDashboard();
+    // Tunggu auth & sinkron sesi selesai, baru render konten
+    Layout.init('dashboard').then((ok) => {
+      if (ok) renderDashboard();
+    });
 
     function renderDashboard() {
       const sesi   = DB.getSesi();
@@ -451,7 +453,7 @@
       const nominalLunas = iuranAll.filter(i => i.status === 'lunas').reduce((a, i) => a + i.nominal, 0);
       const nominalBelum = iuranAll.filter(i => i.status === 'belum').reduce((a, i) => a + i.nominal, 0);
       const segIuran = [
-        { nilai: lunasCount, warna: '#10b981', label: 'Iuran Lunas' },
+        { nilai: lunasCount, warna: '#2563eb', label: 'Iuran Lunas' },
         { nilai: belumCount, warna: '#fbbf24', label: 'Belum Bayar' },
       ];
       const pctIuran = totalIuran > 0 ? Math.round(lunasCount / totalIuran * 100) : 0;
@@ -496,7 +498,7 @@
             <div class="donat-wrap">
               ${buatDonat(segIuran, pctIuran + '%', 'Lunas', '+' + Utils.rupiah(nominalLunas))}
               ${buatLegend([
-                { nilai: nominalLunas, warna: '#10b981', label: `Lunas (${lunasCount} siswa)` },
+                { nilai: nominalLunas, warna: '#2563eb', label: `Lunas (${lunasCount} siswa)` },
                 { nilai: nominalBelum, warna: '#fbbf24', label: `Belum (${belumCount} siswa)` },
               ], nominalLunas + nominalBelum)}
             </div>

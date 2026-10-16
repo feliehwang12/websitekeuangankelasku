@@ -211,13 +211,18 @@
   <script src="../js/auth.js"></script>
   <script src="../js/layout.js"></script>
   <script>
-    Layout.init('kas');
-
-    // Hide aksi jika bukan bendahara
-    if (!DB.isBendahara()) {
-      document.getElementById('btnTambahTransaksi').classList.add('d-none');
-      document.getElementById('btnTambahBulan').classList.add('d-none');
-    }
+    Layout.init('kas').then((ok) => {
+      if (!ok) return;
+      // Hide aksi jika bukan bendahara
+      if (!DB.isBendahara()) {
+        document.getElementById('btnTambahTransaksi').classList.add('d-none');
+        document.getElementById('btnTambahBulan').classList.add('d-none');
+      }
+      // Render konten setelah auth siap
+      renderSummary();
+      renderTrx();
+      renderIuran();
+    });
 
     // ── Render summary ─────────────────────────────────────────
     function renderSummary() {
@@ -444,10 +449,6 @@
     document.getElementById('searchTrx').addEventListener('input', renderTrx);
     document.getElementById('filterJenis').addEventListener('change', renderTrx);
     document.getElementById('filterKategori').addEventListener('change', renderTrx);
-
-    renderSummary();
-    renderTrx();
-    renderIuran();
   </script>
 </body>
 </html>

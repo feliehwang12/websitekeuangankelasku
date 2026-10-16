@@ -168,14 +168,18 @@
   <script src="../js/auth.js"></script>
   <script src="../js/layout.js"></script>
   <script>
-    Layout.init('siswa');
     let viewMode = 'grid';
     let editId   = null;
 
-    // Sembunyikan tombol aksi jika bukan bendahara
-    if (!DB.isBendahara()) {
-      document.getElementById('btnTambahSiswa').classList.add('d-none');
-    }
+    // Tunggu auth selesai sebelum render & cek role
+    Layout.init('siswa').then((ok) => {
+      if (!ok) return;
+      // Sembunyikan tombol aksi jika bukan bendahara
+      if (!DB.isBendahara()) {
+        document.getElementById('btnTambahSiswa').classList.add('d-none');
+      }
+      render();
+    });
 
     function renderSummary() {
       const semua    = DB.getSiswa();
@@ -249,7 +253,6 @@
     }
 
     function render() { renderGrid(); renderTable(); renderSummary(); }
-    render();
 
     function setView(v) {
       viewMode = v;

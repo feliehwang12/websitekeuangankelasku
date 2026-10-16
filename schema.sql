@@ -23,19 +23,51 @@ create table if not exists public.profiles (
 );
 
 -- ── Trigger: auto-buat profil saat user baru sign up ─────────
+-- ══════════════════════════════════════════════════════════════
+--  KODE RAHASIA BENDAHARA
+--  Hanya user yang memasukkan kode ini saat daftar yang jadi bendahara.
+--  Kode disimpan di DATABASE (server), tidak pernah terekspos ke frontend.
+--
+--  ⚠️ GANTI nilai di bawah dengan kode rahasia Anda sendiri!
+--     Bebas, contoh: 'KASKELAS2025', 'bendahara-rahasia-xyz', dll.
+-- ══════════════════════════════════════════════════════════════
+create or replace function public.get_bendahara_code()
+returns text
+language sql
+immutable
+as $$
+  select 'b3nd4h4r4'::text;
+$$;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_role      text;
+  v_role_req  text;
+  v_kode_req  text;
 begin
+  -- Role yang diminta user & kode bendahara yang diketik user (dari metadata)
+  v_role_req := coalesce(new.raw_user_meta_data->>'role', 'siswa');
+  v_kode_req := coalesce(new.raw_user_meta_data->>'kode_bendahara', '');
+
+  -- Default: siswa
+  v_role := 'siswa';
+
+  -- User hanya jadi bendahara jika minta role bendahara DAN kode cocok
+  if v_role_req = 'bendahara' and v_kode_req = public.get_bendahara_code() then
+    v_role := 'bendahara';
+  end if;
+
   insert into public.profiles (id, nama, email, role)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'nama', split_part(new.email,'@',1)),
     new.email,
-    'siswa'
+    v_role
   )
   on conflict (id) do nothing;
   return new;
@@ -149,16 +181,28 @@ alter table public.profiles enable row level security;
 
 drop policy if exists "profiles: semua user login bisa baca"    on public.profiles;
 drop policy if exists "profiles: user update milik sendiri"     on public.profiles;
+drop policy if exists "profiles: user insert milik sendiri"     on public.profiles;
+drop policy if exists "profiles: update nama sendiri (tanpa role)" on public.profiles;
 
 create policy "profiles: semua user login bisa baca"
   on public.profiles for select
   to authenticated
   using (true);
 
-create policy "profiles: user update milik sendiri"
+-- CATATAN: TIDAK ada policy INSERT untuk user.
+-- Profil HANYA dibuat oleh trigger handle_new_user (security definer).
+-- Ini mencegah user menyisipkan profil dengan role bendahara secara manual.
+
+-- User boleh update profil sendiri, TAPI role tidak boleh diubah
+-- (role lama harus sama dengan role baru).
+create policy "profiles: update nama sendiri (tanpa role)"
   on public.profiles for update
   to authenticated
-  using (auth.uid() = id);
+  using (auth.uid() = id)
+  with check (
+    auth.uid() = id
+    and role = (select role from public.profiles where id = auth.uid())
+  );
 
 -- ── transaksi ─────────────────────────────────────────────────
 alter table public.transaksi enable row level security;

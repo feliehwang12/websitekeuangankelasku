@@ -1,42 +1,46 @@
 /* ================================================================
    Keuangan Kelasku — Global Stylesheet
-   Palet: Hijau Emerald (#059669), Putih, Aksen Emas (#D97706)
+   Palet: Biru Navy (#1e3a8a), Biru Muda (#38bdf8), Putih
+   Tema: bersih, modern, minimalis
    ================================================================ */
 
 /* ── Reset & Base ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --emerald-50:  #ecfdf5;
-  --emerald-100: #d1fae5;
-  --emerald-200: #a7f3d0;
-  --emerald-400: #34d399;
-  --emerald-500: #10b981;
-  --emerald-600: #059669;
-  --emerald-700: #047857;
-  --emerald-800: #065f46;
-  --emerald-900: #064e3b;
+  /* Warna utama (navy) — tetap pakai nama --emerald-* agar seluruh
+     komponen lama ikut berubah tanpa perlu refactor besar */
+  --emerald-50:  #eff6ff;   /* biru sangat muda */
+  --emerald-100: #dbeafe;
+  --emerald-200: #bfdbfe;
+  --emerald-400: #60a5fa;
+  --emerald-500: #3b82f6;   /* biru */
+  --emerald-600: #2563eb;   /* biru utama */
+  --emerald-700: #1d4ed8;
+  --emerald-800: #1e3a8a;   /* navy */
+  --emerald-900: #172554;   /* navy gelap */
 
-  --gold-300:    #fcd34d;
-  --gold-400:    #fbbf24;
-  --gold-500:    #f59e0b;
-  --gold-600:    #d97706;
+  /* Aksen (biru muda cerah) — menggantikan emas */
+  --gold-300:    #7dd3fc;
+  --gold-400:    #38bdf8;
+  --gold-500:    #0ea5e9;
+  --gold-600:    #0284c7;
 
   --white:       #ffffff;
-  --gray-50:     #f9fafb;
-  --gray-100:    #f3f4f6;
-  --gray-200:    #e5e7eb;
-  --gray-300:    #d1d5db;
-  --gray-400:    #9ca3af;
-  --gray-500:    #6b7280;
-  --gray-600:    #4b5563;
-  --gray-700:    #374151;
-  --gray-800:    #1f2937;
-  --gray-900:    #111827;
+  --gray-50:     #f8fafc;
+  --gray-100:    #f1f5f9;
+  --gray-200:    #e2e8f0;
+  --gray-300:    #cbd5e1;
+  --gray-400:    #94a3b8;
+  --gray-500:    #64748b;
+  --gray-600:    #475569;
+  --gray-700:    #334155;
+  --gray-800:    #1e293b;
+  --gray-900:    #0f172a;
 
   --red-500:     #ef4444;
   --red-600:     #dc2626;
-  --blue-500:    #3b82f6;
+  --blue-500:    #0ea5e9;
 
   --shadow-sm:   0 1px 2px rgba(0,0,0,.05);
   --shadow:      0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
@@ -296,9 +300,9 @@ p  { color: var(--gray-600); }
   flex-shrink: 0;
 }
 .stat-icon--green  { background: var(--emerald-50); }
-.stat-icon--gold   { background: #fffbeb; }
+.stat-icon--gold   { background: #e0f2fe; }
 .stat-icon--red    { background: #fef2f2; }
-.stat-icon--blue   { background: #eff6ff; }
+.stat-icon--blue   { background: #e0f2fe; }
 
 .stat-info { flex: 1; min-width: 0; }
 .stat-info p    { font-size: .75rem; color: var(--gray-500); font-weight: 500; margin-bottom: .25rem; }

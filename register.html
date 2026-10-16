@@ -17,6 +17,39 @@
     .register-success .success-icon { font-size: 3rem; margin-bottom: 1rem; }
     .register-success h3 { color: var(--emerald-700); margin-bottom: .5rem; }
     .register-success p  { color: var(--gray-500); font-size: .875rem; margin-bottom: 1.25rem; }
+
+    /* ── Pemilihan Peran ─────────────────────────────────── */
+    .role-picker { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .role-option {
+      position: relative;
+      border: 2px solid var(--gray-200);
+      border-radius: var(--radius);
+      padding: 1rem .75rem;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+      background: white;
+    }
+    .role-option:hover { border-color: var(--emerald-300); background: var(--emerald-50); }
+    .role-option input { position: absolute; opacity: 0; pointer-events: none; }
+    .role-option .role-ikon { font-size: 1.6rem; margin-bottom: .35rem; }
+    .role-option .role-nama { font-weight: 700; font-size: .9rem; color: var(--gray-800); }
+    .role-option .role-desc { font-size: .7rem; color: var(--gray-500); margin-top: .2rem; line-height: 1.3; }
+    .role-option.selected {
+      border-color: var(--emerald-600);
+      background: var(--emerald-50);
+      box-shadow: 0 0 0 3px rgba(16,185,129,.12);
+    }
+    .role-option.selected.selected--gold {
+      border-color: var(--gold-500);
+      background: #fffbeb;
+      box-shadow: 0 0 0 3px rgba(245,158,11,.15);
+    }
+    .role-option .role-check {
+      position: absolute; top: .4rem; right: .5rem;
+      font-size: .8rem; opacity: 0; transition: var(--transition);
+    }
+    .role-option.selected .role-check { opacity: 1; }
   </style>
 </head>
 <body>
@@ -61,6 +94,38 @@
             </div>
           </div>
 
+          <!-- Pemilihan Peran -->
+          <div class="form-group">
+            <label>Daftar sebagai <span class="required">*</span></label>
+            <div class="role-picker">
+              <label class="role-option selected" id="roleSiswa">
+                <input type="radio" name="role" value="siswa" checked />
+                <span class="role-check">✅</span>
+                <div class="role-ikon">🎓</div>
+                <div class="role-nama">Siswa</div>
+                <div class="role-desc">Hanya memantau kondisi kas</div>
+              </label>
+              <label class="role-option" id="roleBendahara">
+                <input type="radio" name="role" value="bendahara" />
+                <span class="role-check">✅</span>
+                <div class="role-ikon">💼</div>
+                <div class="role-nama">Bendahara</div>
+                <div class="role-desc">Perlu kode khusus</div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Kode bendahara (muncul hanya jika pilih Bendahara) -->
+          <div class="form-group" id="grupKodeBendahara" style="display:none">
+            <label for="inputKodeBendahara">Kode Bendahara <span class="required">*</span></label>
+            <div class="login-input-wrap">
+              <span class="login-input-icon">🔑</span>
+              <input type="password" id="inputKodeBendahara" class="form-control"
+                placeholder="Masukkan kode rahasia bendahara" maxlength="100" />
+            </div>
+            <p class="form-hint">Kode ini hanya dimiliki pengelola kas. Tanpa kode yang benar, akun otomatis menjadi Siswa.</p>
+          </div>
+
           <div class="form-group">
             <label for="inputPwdReg">Password <span class="required">*</span></label>
             <div class="login-input-wrap">
@@ -91,6 +156,7 @@
         <div class="register-success" id="registerSuccess">
           <div class="success-icon">✅</div>
           <h3>Akun berhasil dibuat!</h3>
+          <p id="suksesInfoRole" style="display:none;background:var(--emerald-50);border:1px solid var(--emerald-200);padding:.65rem;border-radius:var(--radius);color:var(--emerald-700)"></p>
           <p>Silakan masuk menggunakan email dan password yang sudah kamu daftarkan.</p>
           <a href="index.html" class="btn-login" style="display:flex;text-decoration:none;justify-content:center">
             Ke Halaman Login
@@ -126,6 +192,24 @@
       this.textContent = isText ? '👁' : '🙈';
     });
 
+    // ── Pemilihan peran (visual) ──────────────────────────────
+    const optSiswa      = document.getElementById('roleSiswa');
+    const optBendahara  = document.getElementById('roleBendahara');
+    const grupKode      = document.getElementById('grupKodeBendahara');
+    const inputKode     = document.getElementById('inputKodeBendahara');
+    function updateRolePicker() {
+      const val = document.querySelector('input[name="role"]:checked').value;
+      optSiswa.classList.toggle('selected', val === 'siswa');
+      optBendahara.classList.toggle('selected', val === 'bendahara');
+      optBendahara.classList.toggle('selected--gold', val === 'bendahara');
+      // Tampilkan field kode hanya untuk bendahara
+      grupKode.style.display = (val === 'bendahara') ? 'block' : 'none';
+      if (val !== 'bendahara') inputKode.value = '';
+    }
+    optSiswa.querySelector('input').addEventListener('change', updateRolePicker);
+    optBendahara.querySelector('input').addEventListener('change', updateRolePicker);
+    updateRolePicker();
+
     function showAlert(msg, tipe = 'error') {
       const box  = document.getElementById('alertBox');
       const icon = document.getElementById('alertIcon');
@@ -150,11 +234,19 @@
       const email    = document.getElementById('inputEmailReg').value.trim();
       const password = document.getElementById('inputPwdReg').value;
       const konfirm  = document.getElementById('inputPwdKonfirm').value;
+      const role     = document.querySelector('input[name="role"]:checked').value;
+      const kodeBdh  = document.getElementById('inputKodeBendahara').value.trim();
       const btn      = document.getElementById('btnDaftar');
 
       // Validasi client-side
       if (!nama || nama.length < 2) {
         showAlert('Nama lengkap minimal 2 karakter.'); return;
+      }
+      if (!['siswa','bendahara'].includes(role)) {
+        showAlert('Pilih peran yang valid.'); return;
+      }
+      if (role === 'bendahara' && !kodeBdh) {
+        showAlert('Masukkan kode bendahara, atau pilih peran Siswa.'); return;
       }
       if (password !== konfirm) {
         showAlert('Konfirmasi password tidak cocok.'); return;
@@ -166,7 +258,7 @@
       btn.classList.add('loading');
       btn.disabled = true;
 
-      const { data, error } = await Auth.signUp({ nama, email, password });
+      const { data, error, roleFinal } = await Auth.signUp({ nama, email, password, role, kodeBendahara: kodeBdh });
 
       btn.classList.remove('loading');
       btn.disabled = false;
@@ -184,6 +276,21 @@
         }
         showAlert(pesan);
         return;
+      }
+
+      // Jika user minta bendahara tapi role final = siswa → kode salah
+      if (role === 'bendahara' && roleFinal !== 'bendahara') {
+        const infoKode = document.getElementById('suksesInfoRole');
+        if (infoKode) {
+          infoKode.innerHTML = '⚠️ Kode bendahara salah, jadi akun kamu didaftarkan sebagai <strong>Siswa</strong>.';
+          infoKode.style.display = 'block';
+        }
+      } else {
+        const infoKode = document.getElementById('suksesInfoRole');
+        if (infoKode) {
+          infoKode.innerHTML = 'Akun kamu terdaftar sebagai <strong>' + (roleFinal === 'bendahara' ? '💼 Bendahara' : '🎓 Siswa') + '</strong>.';
+          infoKode.style.display = 'block';
+        }
       }
 
       // Tampilkan sukses, sembunyikan form

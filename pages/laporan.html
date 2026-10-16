@@ -215,8 +215,16 @@
   <script src="../js/auth.js"></script>
   <script src="../js/layout.js"></script>
   <script>
-    Layout.init('laporan');
     document.getElementById('printDate').textContent = new Date().toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+    // Tunggu auth selesai sebelum render laporan
+    Layout.init('laporan').then((ok) => {
+      if (!ok) return;
+      renderSummary();
+      renderRiwayat();
+      renderIuranLaporan();
+      renderChart();
+    });
 
     // ── Helper: Donat SVG ──────────────────────────────────────
     function buatDonat(segments, centerPct, centerSub, centerNom, size = 130) {
@@ -240,7 +248,7 @@
           transform="rotate(${rotate.toFixed(2)} ${cx} ${cy})" stroke-linecap="round"/>`;
         offset += pct;
       });
-      const nomColor = centerNom?.startsWith('+') ? '#059669' : centerNom?.startsWith('-') ? '#ef4444' : '#1f2937';
+      const nomColor = centerNom?.startsWith('+') ? '#2563eb' : centerNom?.startsWith('-') ? '#ef4444' : '#1e293b';
       return `<div class="donat-svg-wrap">
         <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
           <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#f3f4f6" stroke-width="20"/>
@@ -449,11 +457,11 @@
           <div class="card-body">
             <div class="donat-wrap">
               ${buatDonat([
-                { nilai: lunasCount, warna: '#10b981', label: 'Lunas' },
+                { nilai: lunasCount, warna: '#2563eb', label: 'Lunas' },
                 { nilai: belumCount, warna: '#fbbf24', label: 'Belum' },
               ], pctIuran + '%', 'Lunas', '+' + Utils.rupiah(nomLunas))}
               ${buatLegend([
-                { nilai: nomLunas, warna: '#10b981', label: 'Lunas (' + lunasCount + ')' },
+                { nilai: nomLunas, warna: '#2563eb', label: 'Lunas (' + lunasCount + ')' },
                 { nilai: nomBelum, warna: '#fbbf24', label: 'Belum (' + belumCount + ')' },
               ], nomLunas + nomBelum)}
             </div>
@@ -576,12 +584,6 @@
     document.getElementById('filterBulanLap').addEventListener('change', renderRiwayat);
     document.getElementById('filterJenisLap').addEventListener('change', renderRiwayat);
     document.getElementById('filterBulanIuranLap').addEventListener('change', renderIuranLaporan);
-
-    // Init
-    renderSummary();
-    renderRiwayat();
-    renderIuranLaporan();
-    renderChart();
   </script>
 </body>
 </html>

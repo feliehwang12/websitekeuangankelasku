@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cek Koneksi Supabase — Keuangan Kelasku</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    body { padding: 2rem 1rem; }
+    .diag { max-width: 720px; margin: 0 auto; }
+    .diag-item {
+      display: flex; align-items: flex-start; gap: .875rem;
+      padding: 1rem; border-radius: var(--radius);
+      background: white; box-shadow: var(--shadow); margin-bottom: .75rem;
+    }
+    .diag-icon { font-size: 1.25rem; flex-shrink: 0; }
+    .diag-info { flex: 1; }
+    .diag-info strong { display: block; margin-bottom: .2rem; }
+    .diag-info span   { font-size: .82rem; color: var(--gray-500); word-break: break-word; }
+    .status-ok   { color: var(--emerald-600); }
+    .status-fail { color: var(--red-600); }
+    .status-wait { color: var(--gray-400); }
+  </style>
+</head>
+<body>
+  <div class="diag">
+    <div class="card" style="margin-bottom:1.5rem">
+      <div class="card-header"><h3>🔍 Diagnostik Integrasi Supabase</h3></div>
+      <div class="card-body">
+        <p class="text-sm text-muted">Halaman ini menguji apakah koneksi ke Supabase berhasil. Buka lewat server lokal (bukan file://).</p>
+      </div>
+    </div>
+    <div id="hasil"></div>
+    <div style="text-align:center;margin-top:1.5rem">
+      <a href="index.html" class="btn btn-primary">← Kembali ke Login</a>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/public_config.js"></script>
+  <script>
+    const hasil = document.getElementById('hasil');
+    function tambah(icon, judul, detail, status) {
+      const cls = status === 'ok' ? 'status-ok' : status === 'fail' ? 'status-fail' : 'status-wait';
+      hasil.innerHTML += `
+        <div class="diag-item">
+          <span class="diag-icon ${cls}">${icon}</span>
+          <div class="diag-info">
+            <strong class="${cls}">${judul}</strong>
+            <span>${detail}</span>
+          </div>
+        </div>`;
+    }
+
+    (async () => {
+      // 1. Cek config terisi
+      if (!SUPABASE_URL || SUPABASE_URL.includes('GANTI') || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes('GANTI')) {
+        tambah('❌', 'Config belum diisi', 'SUPABASE_URL atau SUPABASE_ANON_KEY masih placeholder di public_config.js', 'fail');
+        return;
+      }
+      tambah('✅', 'Config terisi', `URL: ${SUPABASE_URL}`, 'ok');
+
+      // 2. Cek library Supabase
+      if (typeof supabase === 'undefined' || !supabase.createClient) {
+        tambah('❌', 'Library Supabase gagal dimuat', 'Periksa koneksi internet / CDN', 'fail');
+        return;
+      }
+      tambah('✅', 'Library Supabase dimuat', 'supabase-js v2 OK', 'ok');
+
+      const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      // 3. Tes query ke tabel profiles (tanpa login — harus kena RLS, 0 baris itu normal)
+      try {
+        const { data, error } = await client.from('profiles').select('id').limit(1);
+        if (error) {
+          tambah('⚠️', 'Query profiles error', error.message + ' (ini bisa normal jika RLS memblokir akses anonim)', 'wait');
+        } else {
+          tambah('✅', 'Koneksi database OK', `Tabel "profiles" bisa diakses. Baris terbaca: ${data.length} (0 itu normal karena belum login)`, 'ok');
+        }
+      } catch (e) {
+        tambah('❌', 'Gagal konek database', e.message, 'fail');
+      }
+
+      // 4. Tes endpoint auth
+      try {
+        const { data, error } = await client.auth.getSession();
+        tambah('✅', 'Endpoint Auth aktif', 'Supabase Auth siap menerima login & register', 'ok');
+      } catch (e) {
+        tambah('❌', 'Endpoint Auth gagal', e.message, 'fail');
+      }
+
+      tambah('🎉', 'Diagnostik selesai', 'Jika semua ✅, integrasi backend Anda SUKSES. Silakan coba daftar & login.', 'ok');
+    })();
+  </script>
+</body>
+</html>

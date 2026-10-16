@@ -17,18 +17,19 @@ const Layout = {
     // Cek auth Supabase — tunggu sampai sesi terkonfirmasi
     if (typeof Auth !== 'undefined') {
       const user = await Auth.requireAuth();
-      if (!user) return; // requireAuth sudah redirect ke index.html
+      if (!user) return false; // requireAuth sudah redirect ke index.html
     } else {
       // Fallback: cek sesi localStorage
       const sesi = DB.getSesi();
       if (!sesi || !sesi.siswaId) {
         window.location.href = '../index.html';
-        return;
+        return false;
       }
     }
     const sesi = DB.getSesi();
     this.render(sesi, pageId);
     this.bindEvents();
+    return true;
   },
 
   render(sesi, pageId) {

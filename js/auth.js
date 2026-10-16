@@ -24,23 +24,46 @@ const Auth = (() => {
   }
 
   // ── Sign Up ──────────────────────────────────────────────────
-  async function signUp({ nama, email, password }) {
+  // role: 'siswa' | 'bendahara'
+  // kodeBendahara: kode rahasia (hanya relevan jika role = 'bendahara').
+  // Penentuan role FINAL dilakukan oleh trigger database, bukan di sini.
+  async function signUp({ nama, email, password, role, kodeBendahara }) {
     const client = getClient();
     if (!client) return { error: { message: 'Koneksi Supabase gagal.' } };
+
+    const peran = (role === 'bendahara') ? 'bendahara' : 'siswa';
 
     const { data, error } = await client.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
       options: {
-        data: { nama: nama.trim() }   // disimpan di auth.users.raw_user_meta_data
+        // Metadata ini dibaca oleh trigger handle_new_user di database.
+        // Trigger yang memvalidasi kode & menentukan role final.
+        data: {
+          nama: nama.trim(),
+          role: peran,
+          kode_bendahara: (peran === 'bendahara') ? (kodeBendahara || '') : '',
+        }
       }
     });
 
     if (error) return { error };
 
-    // Jika email confirmation dimatikan di Supabase, user langsung terdaftar
-    // Kita tetap arahkan ke login — tidak auto-login
-    return { data, error: null };
+    // Cek role final yang ditentukan trigger DB (untuk info ke user).
+    let roleFinal = 'siswa';
+    try {
+      if (data?.user) {
+        const { data: profil } = await client
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+        if (profil?.role) roleFinal = profil.role;
+      }
+    } catch (_) { /* abaikan — default siswa */ }
+
+    // Tidak auto-login — user tetap diarahkan ke halaman login.
+    return { data, error: null, roleFinal };
   }
 
   // ── Sign In ──────────────────────────────────────────────────
